@@ -2,7 +2,7 @@
 Nombre del archivo: parpadeo.py
 Autor: Irene Pereda Serrano
 Fecha de creación: 20/03/2024
-Descripción: Implementación de funciones para control de un LED
+Descripción: Implementación de funciones para control de un LED integrado en la placa
 """
 
 import time

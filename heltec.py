@@ -1,5 +1,8 @@
 """
-This file contains the definitions and declarations for the Heltec library.
+Nombre del archivo: heltec.py
+Autor: Irene Pereda Serrano
+Fecha de creación: 25/03/2024
+Descripción: This file contains the definitions and declarations for the Heltec library.
 """
 
 # 'PRG' Button
