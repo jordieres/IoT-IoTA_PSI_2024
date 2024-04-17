@@ -1,3 +1,13 @@
+"""
+File Name: decoder.py
+Original Autor: Rafael Römhild
+Acquisition Date: 15/04/2024
+Original Source: https://github.com/rroemhild/micropython-ruuvitag/tree/main
+Description: This file contains functions for decoding raw data from RuuviTag
+             sensors into structured data formats.
+"""
+
+
 import ustruct
 import ubinascii
 

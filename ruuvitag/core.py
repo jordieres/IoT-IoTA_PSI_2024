@@ -1,3 +1,13 @@
+"""
+File Name: core.py
+Original Autor: Rafael Römhild
+Acquisition Date: 15/04/2024
+Original Source: https://github.com/rroemhild/micropython-ruuvitag/tree/main
+Description: This file contains the core functionality for scanning RuuviTag
+             sensors using Bluetooth Low Energy (BLE) on a MicroPython platform.
+"""
+
+
 import ubinascii
 import ubluetooth
 
