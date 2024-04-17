@@ -1,14 +1,14 @@
 """
-Nombre del archivo: BLEbasic.py
-Autor: Irene Pereda Serrano
-Fecha de creación: 05/04/2024
-Descripción: Conexión Bluetooth con un dispositivo y lectura de mensajes enviados vía UART.
-             Ejemplo de encendido/apagado del led vía Bluetooth.
+File Name: BLEbasic.py
+Author: Irene Pereda Serrano
+Created On: 05/04/2024
+Description: Bluetooth connection with a device and reading messages sent via UART.
+             Example of turning the LED on/off via Bluetooth.
 """
 
 from machine import Pin
 import bluetooth
-from BLE import BLEUART
+from bluetooth.BLE import BLEUART
 
 # Definición del nombre del dispositivo Bluetooth
 name = "ESP32-s3"
@@ -19,10 +19,6 @@ uart = BLEUART(ble, name)
 print(name, " Bluetooth del dispositivo activado")
 
 led = Pin(35, Pin.OUT)
-
-
-
-
 
 
 # Método de manejo de interrupciones de recepción
@@ -50,9 +46,3 @@ def send_message(message):
 
 # Asignación del manejador de interrupciones a la instancia UART
 uart.irq(handler=on_rx)
-
-
-# Bucle para enviar mensajes introducidos por teclado
-while True:
-    mensaje = input("Introduce un mensaje para enviar via UART: ")
-    send_message(mensaje)

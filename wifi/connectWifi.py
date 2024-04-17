@@ -1,8 +1,8 @@
 """
-Nombre del archivo: connectWifi.py
-Autor: Irene Pereda Serrano
-Fecha de creación: 04/04/2024
-Descripción: Conexión a la red wifi del hogar
+File Name: connectWifi.py
+Author: Irene Pereda Serrano
+Created On: 04/04/2024
+Description: Connecting to the home Wi-Fi network
 """
 
 import network

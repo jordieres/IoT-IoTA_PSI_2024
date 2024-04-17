@@ -1,13 +1,14 @@
 """
-Nombre del archivo: oledDisplay.py
-Autor: Irene Pereda Serrano
-Fecha de creación: 04/04/2024
-Descripción: Ejemplo de conexión satisfactoria para imprimir información en la pantalla OLED
+File Name: oledSetup.py
+Author: Irene Pereda Serrano
+Created On: 04/04/2024
+Description: This file initializes and sets up the SSD1306 OLED display module on the Heltec LoRa 32 board
 """
 
 import time
-import ssd1306
+from oled import ssd1306
 from machine import Pin, SoftI2C
+
 
 # Heltec LoRa 32 with OLED Display
 oled_width = 128
@@ -36,12 +37,3 @@ i2c = SoftI2C(scl=i2c_scl, sda=i2c_sda)
 oled = ssd1306.SSD1306_I2C(oled_width, oled_height, i2c, addr=0x3c)
 oled.fill(1)
 oled.show()
-
-# oled.fill(0)
-# oled.text('Hola!', 0, 0)
-# oled.text('Soy Irene', 0, 10)
-# oled.text('Display en OLED', 0, 20)
-# oled.text('CONSEGUIDO!!!', 0, 30)
-# oled.show()
-
-
