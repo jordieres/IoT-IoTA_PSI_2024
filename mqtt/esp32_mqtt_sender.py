@@ -27,7 +27,7 @@ def main():
     # Connect to the WiFi network
     connectWifi.connect_wifi()
 
-    # Simulate temperature data (replace this part with reading from the sensor)
+    # Simulate temperature data
     temperature_data = "25.5"
 
     # Send data to MQTT Broker
