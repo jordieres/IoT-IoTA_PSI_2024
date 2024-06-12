@@ -18,10 +18,9 @@ wifiPass = "torrejonWificasa"
 mqttServer = b"apiict00.etsii.upm.es"
 mqttPort = 1883
 mqttClientID = b"ESP32-S3"
-mqttUser = b""
-mqttPass = b""
-mqttTopicTemp = b"test/Temperatura"
-mqttTopicHum = b"test/Humedad"
+mqttUser = b"ipereda"
+mqttPass = b"Madrid#141"
+mqttTopicTemp = b"UPM/PrdMon/S001"
 
 if connect_wifi(wifiSSID, wifiPass):
     client = MQTTClient(client_id=mqttClientID, server=mqttServer, port=mqttPort, user=mqttUser, password=mqttPass,
@@ -38,7 +37,6 @@ if connect_wifi(wifiSSID, wifiPass):
         # Publicar los datos
         client.publish(topic=mqttTopicTemp, msg=str(Temperatura))
         time.sleep(2)
-        client.publish(topic=mqttTopicHum, msg=str(Humedad))
 
         print("Data sent to MQTT Broker")
 
