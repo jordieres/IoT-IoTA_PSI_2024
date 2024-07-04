@@ -8,14 +8,18 @@ Description: Connecting to the home Wi-Fi network
 import network
 import time
 
-wlan = network.WLAN(network.STA_IF)  # create station interface
-wlan.active(True)  # activate the interface
-wlan.isconnected()  # check if the station is connected to an AP
-time.sleep_ms(500)
-if not wlan.isconnected():
-    print('connecting to network...')
-    wlan.connect('PeredaSerrano', 'torrejonWificasa')  # connect to an AP
-    time.sleep_ms(500)
-    while not wlan.isconnected():
-        pass
-print('network config:', wlan.ifconfig())
+
+def connect_wifi(net, password):
+    wlan = network.WLAN(network.STA_IF)  # create station interface
+    if not wlan.isconnected():
+        wlan.active(True)
+        wlan.connect(net, password)  # connect to an AP
+        print('Connecting to the network', net + "...")
+        timeout = time.time()
+        while not wlan.isconnected():
+            if time.ticks_diff(time.time(), timeout) > 10:
+                wlan.active(False)
+                return False
+    print("Succesful connection!")
+    print('Network data (IP/netmask/gw/DNS):', wlan.ifconfig())
+    return True
