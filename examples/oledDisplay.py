@@ -11,6 +11,8 @@ from oled import oledSetup
 oled = oledSetup.oled
 
 oled.fill(0)
+oled.show()
+
 oled.text('Hola!', 0, 0)
 oled.text('Soy Irene', 0, 10)
 oled.text('Display en OLED', 0, 20)

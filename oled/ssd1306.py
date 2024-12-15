@@ -62,10 +62,13 @@ class SSD1306:
             SET_COM_PIN_CFG, 0x02 if self.height == 32 else 0x12,
             # timing and driving scheme
             SET_DISP_CLK_DIV, 0x80,
-            SET_PRECHARGE, 0x22 if self.external_vcc else 0xf1,
-            SET_VCOM_DESEL, 0x30, # 0.83*Vcc
+            # SET_PRECHARGE, 0x22 if self.external_vcc else 0xf1,
+            SET_PRECHARGE, 0xF1,  # Tiempo de precarga
+            # SET_VCOM_DESEL, 0x30, # 0.83*Vcc
+            SET_VCOM_DESEL, 0x40,  # Voltaje de deselección VCOM
             # display
-            SET_CONTRAST, 0xff, # maximum
+            #SET_CONTRAST, 0xff, # maximum
+            SET_CONTRAST, 0xCF,  # Contraste optimizado
             SET_ENTIRE_ON, # output follows RAM contents
             SET_NORM_INV, # not inverted
             # charge pump

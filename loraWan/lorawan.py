@@ -9,14 +9,15 @@ from loraWan import radio
 import ubinascii
 import time
 from random import randint
-
+import random
 
 __DEBUG__ = True
 
+# Claves necesarias para la autenticación con TTN
 ttn_config={
-    'device_address': bytearray([0x27, 0xFD, 0xF5, 0xBC]),
-    'network_key': bytearray([0x1D, 0xC6, 0x08, 0x0B, 0x48, 0x91, 0x78, 0x0E, 0xC2, 0x9B, 0x80, 0xA3, 0x7D, 0x8F, 0x0B, 0x6F]),
-    'app_key': bytearray([0x9A, 0xA5, 0xD8, 0xA8, 0x3B, 0x21, 0x41, 0xC8, 0xB3, 0xBE, 0x91, 0xEA, 0x74, 0x81, 0x2A, 0xCD])
+    'device_address': bytearray([0x27, 0xFD, 0xF5, 0xB6]),
+    'network_key': bytearray([0x28, 0x85, 0xC8, 0xCC, 0xAF, 0xE8, 0x9C, 0xF7, 0x4F, 0x78, 0x50, 0xF1, 0xFE, 0x7B, 0xF2, 0x82]),
+    'app_key': bytearray([0x53, 0xEA, 0xE4, 0xAD, 0xC5, 0x53, 0x0D, 0x18, 0xA4, 0x1C, 0x37, 0xDC, 0x85, 0x68, 0x2C, 0x32])
 }
 
 
@@ -131,7 +132,14 @@ def lorawan_pkt(data, data_length):
 modem = radio.get_modem()
 # modem.calibrate()
 
-for i in range(10):
-    msg=b'counter:{}'.format(frame_counter)
-    send_data(msg)
-    time.sleep(10)
+# while True:
+#    # msg=b'counter:{}'.format(frame_counter)
+#
+#   # Generar datos aleatorios de temperatura y humedad
+#    temp = round(random.uniform(20.0, 30.0), 2)  # Por ejemplo, entre 20°C y 30°C
+#    humedad = random.randint(30, 70)  # Por ejemplo, entre 30% y 70%
+#
+#   # Crear el mensaje con los datos generados
+#    msg = b'Dispositivo: Ruuvi sensor, Temp: {}C, Humedad: {}%'.format(temp, humedad)
+#    send_data(msg)
+#    time.sleep(10)
