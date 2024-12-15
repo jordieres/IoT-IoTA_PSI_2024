@@ -16,7 +16,7 @@ oled_height = 64
 
 # Vext ON
 vextPin = Pin(36, Pin.OUT)
-vextPin.value(1)
+vextPin.value(0)
 
 # OLED reset pin
 i2c_rst = Pin(21, Pin.OUT)
@@ -37,3 +37,4 @@ i2c = SoftI2C(scl=i2c_scl, sda=i2c_sda)
 oled = ssd1306.SSD1306_I2C(oled_width, oled_height, i2c, addr=0x3c)
 oled.fill(1)
 oled.show()
+oled.contrast(0xFF)
