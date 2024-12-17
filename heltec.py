@@ -41,5 +41,5 @@ SCL_OLED = 18
 RST_OLED = 21
 
 # USB_UART
-RX = 46
-TX = 45
+RX = 48
+TX = 47
