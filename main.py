@@ -4,106 +4,159 @@ from loraWan import lorawan
 from ustruct import pack
 from oled import oledSetup
 
-# Inicializa el OLED
 oled = oledSetup.oled
 
-# Funciones para empaquetar los datos
+
+# Functions to pack data
 def pack_temp(temp):
-    """Temperatura en 0.005 grados como short con signo (16 bits)"""
     temp_conv = round(temp / 0.005)
     return pack("!h", temp_conv)
 
 
 def pack_humid(hum):
-    """Humedad en 0.0025% como unsigned short (16 bits)"""
     hum_conv = round(hum / 0.0025)
     return pack("!H", hum_conv)
 
 
 def pack_pressure(pressure):
-    """Empaqueta la presión en Pa como unsigned short (16 bits)"""
     pres_conv = round(pressure / 10.0)
     return pack("!H", pres_conv)
 
 
+def mean(data):
+    return sum(data) / len(data) if data else 0
+
+
+def stdev(data):
+    if len(data) <= 1:
+        return 0
+    avg = mean(data)
+    variance = sum((x - avg) ** 2 for x in data) / len(data)
+    return variance ** 0.5
+
+
+def calculate_statistics(data):
+    """Calculate max, min, mean, and standard deviation for a list of data."""
+    if not data:
+        return 0, 0, 0, 0
+    return max(data), min(data), mean(data), stdev(data)
+
+
+def display_countdown(remaining_time):
+    """Display the countdown on the OLED screen."""
+    minutes, seconds = divmod(remaining_time, 60)
+    oled.fill(0)
+    oled.text("Next TTN send:", 0, 0)
+    oled.text(f"{minutes:02}:{seconds:02}", 0, 10)
+    oled.show()
+
 
 def main(scan_interval, send_interval):
-    # Inicializa el sensor RuuviTag
+
     ruuvi = core.RuuviTag()
 
-    def display_message(lines, delay=2):
-        """Muestra líneas de texto en el OLED durante un tiempo definido."""
-        oled.fill(0)  # Limpia la pantalla
-        for i, line in enumerate(lines):
-            oled.text(line, 0, i * 10)  # Imprime cada línea con un espaciado de 10px
-        oled.show()
-        time.sleep(delay)  # Pausa para mostrar el mensaje
+    temperature_data = []
+    humidity_data = []
+    pressure_data = []
 
-    def countdown(wait_time):
-        """Muestra una cuenta atrás en el OLED."""
-        for remaining in range(wait_time, 0, -1):
-            oled.fill(0)
-            oled.text("Esperando:", 0, 0)
-            oled.text(f"{remaining // 60:02}:{remaining % 60:02}", 0, 10)
-            oled.show()
-            time.sleep(1)
+    def display_message(lines, delay=2):
+        oled.fill(0)
+        for i, line in enumerate(lines):
+            oled.text(line, 0, i * 10)
+        oled.show()
+        time.sleep(delay)
 
     def callback_handler(data):
-        # Verifica y procesa los datos del sensor
+        """Process the received RuuviTag data and store it temporarily."""
         if data:
+            temperature_data.append(data.temperature)
+            humidity_data.append(data.humidity)
+            pressure_data.append(data.pressure)
+
             display_message([
-                "Datos recibidos:",
-                f"MAC: {data.mac}",
-                f"Temp: {data.temperature} C",
-                f"Humedad: {data.humidity}%",
-                f"Presion: {data.pressure} hPa",
-            ], delay=3)  # Muestra el mensaje durante 3 segundos
-            print("Datos recibidos del sensor Ruuvi:")
-            print("MAC:", data.mac)
-            print("Temperatura:", data.temperature, "°C")
-            print("Humedad:", data.humidity, "%")
-            print("Presión:", data.pressure, "hPa")
-            print("Voltaje de la batería:", data.battery_voltage, "mV")
+                "Data received:",
+                f"Temp: {data.temperature:.2f} C",
+                f"Hum: {data.humidity:.2f}%",
+                f"Press: {data.pressure:.2f} hPa",
+            ], delay=2)
 
-            # Empaqueta los datos relevantes en un payload optimizado
-            payload = (
-                    pack_temp(data.temperature) +
-                    pack_humid(data.humidity) +
-                    pack_pressure(data.pressure) +
-                    pack("!H", data.battery_voltage)
-            )
+            print(f"Sensor data: Temp={data.temperature} C, Hum={data.humidity}%, Press={data.pressure} hPa")
 
-            # Envía los datos a TTN
-            display_message(["Enviando datos...", "A TTN"])
-            print("Enviando datos a TTN...")
-            lorawan.send_data(payload)
-            display_message(["Datos enviados!", "Con exito!"])
-            print("Datos enviados con éxito.\n")
-
-    # Asigna la función de callback al objeto RuuviTag
     ruuvi._callback_handler = callback_handler
 
-    # Bucle principal de escaneo y envío de datos
+    last_send_time = time.time()  # Last time data was sent via LoRa
+    last_scan_time = time.time()  # Last time BLE scanning was performed
+
     try:
         while True:
-            display_message(["Escaneando...", "Sensores Ruuvi"])
-            print("Iniciando escaneo de sensores Ruuvi...")
-            ruuvi.scan()  # Inicia el escaneo de dispositivos RuuviTag
-            time.sleep(scan_interval)  # Pausa antes de la siguiente iteración de escaneo
-            countdown(send_interval)  # Muestra la cuenta atrás en pantalla
+            current_time = time.time()
+
+            # Remaining time for the next send
+            time_to_next_send = int(send_interval - (current_time - last_send_time))
+            if time_to_next_send > 0:
+                display_countdown(time_to_next_send)
+
+            # Perform BLE scanning every `scan_interval`
+            if current_time - last_scan_time >= scan_interval:
+                print("Scanning Ruuvi sensors...")
+                display_message(["Scanning...", "Ruuvi sensors"])
+                ruuvi.scan()
+                last_scan_time = current_time
+
+            # Send data to TTN every `send_interval`
+            if current_time - last_send_time >= send_interval:
+                print("Preparing data to send to TTN...")
+
+                temp_stats = calculate_statistics(temperature_data)
+                hum_stats = calculate_statistics(humidity_data)
+                pres_stats = calculate_statistics(pressure_data)
+
+                if all(stat is not None for stat in temp_stats) and all(stat is not None for stat in hum_stats) and all(
+                        stat is not None for stat in pres_stats):
+                    payload = (
+                            pack_temp(temp_stats[0]) +
+                            pack_temp(temp_stats[1]) +
+                            pack_temp(temp_stats[2]) +
+                            pack_temp(temp_stats[3]) +
+                            pack_humid(hum_stats[0]) +
+                            pack_humid(hum_stats[1]) +
+                            pack_humid(hum_stats[2]) +
+                            pack_humid(hum_stats[3]) +
+                            pack_pressure(pres_stats[0]) +
+                            pack_pressure(pres_stats[1]) +
+                            pack_pressure(pres_stats[2]) +
+                            pack_pressure(pres_stats[3])
+                    )
+
+                    display_message(["Sending data...", "To TTN"])
+                    try:
+                        lorawan.send_data(payload)
+                        display_message(["Data sent!", "Successfully"])
+                        print("Data sent to TTN successfully.")
+                    except Exception as e:
+                        display_message(["Error sending", "data to TTN"])
+                        print(f"Error sending data to TTN: {e}")
+                else:
+                    print("Insufficient data for creating payload.")
+
+                temperature_data.clear()
+                humidity_data.clear()
+                pressure_data.clear()
+
+                last_send_time = current_time
+
+            time.sleep(1)
     except KeyboardInterrupt:
         ruuvi.stop()
-        display_message(["Escaneo detenido", "manualmente"])
-        print("Escaneo detenido manualmente.")
+        display_message(["Scanning stopped", "manually"])
+        print("Scanning manually stopped.")
 
 
-# Variables de intervalo de espera en segundos
-scan_interval = 5  # Intervalo de escaneo del sensor (en segundos)
-send_interval = 900  # Intervalo entre envíos (en segundos) 15 minutos
+scan_interval = 30   # BLE scan interval
+send_interval = 900  # LoRa send interval
 
 if __name__ == "__main__":
-    # Mensaje de inicio
     oled.fill(0)
-    oled.text("Inicializando...", 0, 0)
+    oled.text("Initializing...", 0, 0)
     oled.show()
-    main(scan_interval=10, send_interval=900)
+    main(scan_interval=30, send_interval=900)
