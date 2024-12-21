@@ -40,6 +40,7 @@ class GPSHandler:
                 'hdop': self.gps.hdop,
             }
         else:
+            print("GPS data invalid. No fix available.")
             return None
 
     def print_gps_info(self):
@@ -72,3 +73,7 @@ def run_gps_handler():
             time.sleep(3)  # Pequeño retraso para evitar sobrecargar el sistema
         except Exception as e:
             print(f"An error occurred: {e}")
+
+
+def initialize_gps():
+    return GPSHandler(tx_pin=heltec.TX, rx_pin=heltec.RX, local_offset=1)

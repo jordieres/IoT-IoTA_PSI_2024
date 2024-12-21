@@ -3,11 +3,12 @@ from ruuvitag import core
 from loraWan import lorawan
 from ustruct import pack
 from oled import oledSetup
+from gps.gps import initialize_gps
 
 oled = oledSetup.oled
 
 
-# Functions to pack data
+# Functions to pack sensor data
 def pack_temp(temp):
     temp_conv = round(temp / 0.005)
     return pack("!h", temp_conv)
@@ -23,6 +24,52 @@ def pack_pressure(pressure):
     return pack("!H", pres_conv)
 
 
+def pack_latitude(latitude_str):
+    """
+    Empaqueta la latitud en un entero escalado.
+    """
+    coord, hemi = latitude_str.split("°")
+    decimal_lat = float(coord.strip())
+    if hemi.strip() == 'S':
+        decimal_lat = -decimal_lat
+    return pack("!i", int(decimal_lat * 10 ** 6))  # Escala a 6 decimales
+
+
+def pack_longitude(longitude_str):
+    """
+    Empaqueta la longitud en un entero escalado.
+    """
+    coord, hemi = longitude_str.split("°")
+    decimal_lon = float(coord.strip())
+    if hemi.strip() == 'W':
+        decimal_lon = -decimal_lon
+    return pack("!i", int(decimal_lon * 10 ** 6))  # Escala a 6 decimales
+
+
+def pack_altitude(altitude):
+    """
+    Empaqueta la altitud como un entero (en metros).
+    """
+    return pack("!H", int(altitude))
+
+
+def pack_satellites(satellites):
+    """
+    Empaqueta el número de satélites como un entero.
+    """
+    return pack("!B", satellites)
+
+
+# Function to pack HDOP
+def pack_hdop(hdop):
+    """
+    Escala y empaqueta el HDOP (Dilución Horizontal de Precisión).
+    """
+    hdop_scaled = int(hdop * 100)  # Escala a centésimas
+    return pack("!B", hdop_scaled)
+
+
+# Utility functions
 def mean(data):
     return sum(data) / len(data) if data else 0
 
@@ -52,8 +99,8 @@ def display_countdown(remaining_time):
 
 
 def main(scan_interval, send_interval):
-
     ruuvi = core.RuuviTag()
+    gps_handler = initialize_gps()
 
     temperature_data = []
     humidity_data = []
@@ -90,26 +137,26 @@ def main(scan_interval, send_interval):
     try:
         while True:
             current_time = time.time()
-
-            # Remaining time for the next send
             time_to_next_send = int(send_interval - (current_time - last_send_time))
+
             if time_to_next_send > 0:
                 display_countdown(time_to_next_send)
 
-            # Perform BLE scanning every `scan_interval`
             if current_time - last_scan_time >= scan_interval:
                 print("Scanning Ruuvi sensors...")
                 display_message(["Scanning...", "Ruuvi sensors"])
                 ruuvi.scan()
                 last_scan_time = current_time
 
-            # Send data to TTN every `send_interval`
             if current_time - last_send_time >= send_interval:
                 print("Preparing data to send to TTN...")
 
                 temp_stats = calculate_statistics(temperature_data)
                 hum_stats = calculate_statistics(humidity_data)
                 pres_stats = calculate_statistics(pressure_data)
+
+                gps_handler.read_gps_data()
+                gps_data = gps_handler.get_gps_info()
 
                 if all(stat is not None for stat in temp_stats) and all(stat is not None for stat in hum_stats) and all(
                         stat is not None for stat in pres_stats):
@@ -125,7 +172,12 @@ def main(scan_interval, send_interval):
                             pack_pressure(pres_stats[0]) +
                             pack_pressure(pres_stats[1]) +
                             pack_pressure(pres_stats[2]) +
-                            pack_pressure(pres_stats[3])
+                            pack_pressure(pres_stats[3]) +
+                            pack_latitude(gps_data['latitude']) +
+                            pack_longitude(gps_data['longitude']) +
+                            pack_altitude(gps_data['altitude']) +
+                            pack_satellites(gps_data['satellites_in_use']) +
+                            pack_hdop(gps_data['hdop'])
                     )
 
                     display_message(["Sending data...", "To TTN"])
@@ -152,7 +204,7 @@ def main(scan_interval, send_interval):
         print("Scanning manually stopped.")
 
 
-scan_interval = 30   # BLE scan interval
+scan_interval = 30  # BLE scan interval
 send_interval = 900  # LoRa send interval
 
 if __name__ == "__main__":
