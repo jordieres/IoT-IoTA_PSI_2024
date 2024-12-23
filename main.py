@@ -25,47 +25,31 @@ def pack_pressure(pressure):
 
 
 def pack_latitude(latitude_str):
-    """
-    Empaqueta la latitud en un entero escalado.
-    """
     coord, hemi = latitude_str.split("°")
     decimal_lat = float(coord.strip())
     if hemi.strip() == 'S':
         decimal_lat = -decimal_lat
-    return pack("!i", int(decimal_lat * 10 ** 6))  # Escala a 6 decimales
+    return pack("!i", int(decimal_lat * 10 ** 6))
 
 
 def pack_longitude(longitude_str):
-    """
-    Empaqueta la longitud en un entero escalado.
-    """
     coord, hemi = longitude_str.split("°")
     decimal_lon = float(coord.strip())
     if hemi.strip() == 'W':
         decimal_lon = -decimal_lon
-    return pack("!i", int(decimal_lon * 10 ** 6))  # Escala a 6 decimales
+    return pack("!i", int(decimal_lon * 10 ** 6))
 
 
 def pack_altitude(altitude):
-    """
-    Empaqueta la altitud como un entero (en metros).
-    """
     return pack("!H", int(altitude))
 
 
 def pack_satellites(satellites):
-    """
-    Empaqueta el número de satélites como un entero.
-    """
     return pack("!B", satellites)
 
 
-# Function to pack HDOP
 def pack_hdop(hdop):
-    """
-    Escala y empaqueta el HDOP (Dilución Horizontal de Precisión).
-    """
-    hdop_scaled = int(hdop * 100)  # Escala a centésimas
+    hdop_scaled = int(hdop * 100)
     return pack("!B", hdop_scaled)
 
 
@@ -120,12 +104,7 @@ def main(scan_interval, send_interval):
             humidity_data.append(data.humidity)
             pressure_data.append(data.pressure)
 
-            display_message([
-                "Data received:",
-                f"Temp: {data.temperature:.2f} C",
-                f"Hum: {data.humidity:.2f}%",
-                f"Press: {data.pressure:.2f} hPa",
-            ], delay=2)
+            display_message(["Data received"])
 
             print(f"Sensor data: Temp={data.temperature} C, Hum={data.humidity}%, Press={data.pressure} hPa")
 
@@ -161,6 +140,9 @@ def main(scan_interval, send_interval):
                 if all(stat is not None for stat in temp_stats) and all(stat is not None for stat in hum_stats) and all(
                         stat is not None for stat in pres_stats):
                     payload = (
+                            pack_temp(temperature_data[-1]) +
+                            pack_humid(humidity_data[-1]) +
+                            pack_pressure(pressure_data[-1]) +
                             pack_temp(temp_stats[0]) +
                             pack_temp(temp_stats[1]) +
                             pack_temp(temp_stats[2]) +
