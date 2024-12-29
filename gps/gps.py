@@ -16,19 +16,19 @@ from gps.micropyGPS import MicropyGPS
 
 class GPSHandler:
     def __init__(self, tx_pin, rx_pin, uart_num=2, baudrate=9600, local_offset=1):
-        """Inicializa el objeto GPS y la comunicación UART."""
+        """Initializes GPS object and UART communication"""
         self.uart = machine.UART(uart_num, baudrate=baudrate, tx=Pin(tx_pin), rx=Pin(rx_pin))
         self.gps = MicropyGPS(local_offset=local_offset)
 
     def read_gps_data(self):
-        """Lee los datos del GPS desde UART y actualiza el objeto GPS."""
+        """Read GPS data from UART and update GPS object"""
         while self.uart.any():
             data = self.uart.read()
             for byte in data:
                 self.gps.update(chr(byte))
 
     def get_gps_info(self):
-        """Devuelve un diccionario con la información procesada del GPS."""
+        """Returns a dictionary with the processed GPS information"""
         if self.gps.valid:
             return {
                 'timestamp': self.gps.timestamp,
@@ -44,7 +44,7 @@ class GPSHandler:
             return None
 
     def print_gps_info(self):
-        """Imprime la información procesada del GPS."""
+        """Prints the processed GPS information"""
         gps_info = self.get_gps_info()
         if gps_info:
             print('UTC Timestamp:', gps_info['timestamp'])
@@ -60,17 +60,17 @@ class GPSHandler:
 
 
 def run_gps_handler():
-    """Función principal para manejar el GPS."""
-    # Establece el offset manualmente (1 para UTC+1, 2 para UTC+2, etc.)
+    """Main function to manage GPS"""
+    # Set the offset manually (1 for UTC+1, 2 for UTC+2, etc.)
     print("Initializing GPS Handler...")
     local_offset = 1
     gps_handler = GPSHandler(tx_pin=heltec.TX, rx_pin=heltec.RX, local_offset=local_offset)
 
     while True:
         try:
-            gps_handler.read_gps_data()  # Lee y procesa datos desde el módulo GPS
-            gps_handler.print_gps_info()  # Muestra los datos procesados
-            time.sleep(3)  # Pequeño retraso para evitar sobrecargar el sistema
+            gps_handler.read_gps_data()
+            gps_handler.print_gps_info()
+            time.sleep(3)
         except Exception as e:
             print(f"An error occurred: {e}")
 

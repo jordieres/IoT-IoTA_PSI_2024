@@ -205,12 +205,17 @@ def main(scan_interval, send_interval):
             time.sleep(1)
     except KeyboardInterrupt:
         ruuvi.stop()
-        display_message(["Scanning stopped", "manually"])
-        print("Scanning manually stopped.")
+        display_message(["Scanning stopped"])
+        print("Scanning stopped.")
+
+    except Exception as e:
+        ruuvi.stop()
+        display_message(["Unexpected error"])
+        print(f"Unexpected error: {e}")
 
 
 if __name__ == "__main__":
     oled.fill(0)
     oled.text("Initializing...", 0, 0)
     oled.show()
-    main(scan_interval=30, send_interval=1800)
+    main(scan_interval=30, send_interval=900)
