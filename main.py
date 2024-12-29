@@ -82,6 +82,30 @@ def display_countdown(remaining_time):
     oled.show()
 
 
+def get_valid_gps_data(gps_handler, max_attempts=10):
+    """Intenta obtener datos GPS válidos en un número limitado de intentos."""
+    print("Checking GPS data validity...")
+    for attempt in range(max_attempts):
+        gps_handler.read_gps_data()
+        gps_data = gps_handler.get_gps_info()
+        if gps_data and gps_data['satellites_in_use'] >= 3 and gps_data['hdop'] <= 10:
+            print(f"Valid GPS data obtained on attempt {attempt + 1}: {gps_data}")
+            return gps_data
+        else:
+            print(f"Invalid GPS data on attempt {attempt + 1}. Retrying...")
+        time.sleep(1)  # Pequeño retraso entre intentos
+
+    # Si no se obtienen datos válidos, devuelve valores predeterminados
+    print("No valid GPS data obtained after retries. Setting default values.")
+    return {
+        'latitude': "0.0000° N",
+        'longitude': "0.0000° E",
+        'altitude': 0,
+        'satellites_in_use': 0,
+        'hdop': 99.99,
+    }
+
+
 def main(scan_interval, send_interval):
     ruuvi = core.RuuviTag()
     gps_handler = initialize_gps()
@@ -134,8 +158,7 @@ def main(scan_interval, send_interval):
                 hum_stats = calculate_statistics(humidity_data)
                 pres_stats = calculate_statistics(pressure_data)
 
-                gps_handler.read_gps_data()
-                gps_data = gps_handler.get_gps_info()
+                gps_data = get_valid_gps_data(gps_handler)
 
                 if all(stat is not None for stat in temp_stats) and all(stat is not None for stat in hum_stats) and all(
                         stat is not None for stat in pres_stats):
@@ -186,11 +209,9 @@ def main(scan_interval, send_interval):
         print("Scanning manually stopped.")
 
 
-scan_interval = 30  # BLE scan interval
-send_interval = 900  # LoRa send interval
 
 if __name__ == "__main__":
     oled.fill(0)
     oled.text("Initializing...", 0, 0)
     oled.show()
-    main(scan_interval=30, send_interval=900)
+    main(scan_interval=30, send_interval=1800)

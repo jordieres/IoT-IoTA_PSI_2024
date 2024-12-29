@@ -9,7 +9,6 @@ from loraWan import radio
 import ubinascii
 import time
 from random import randint
-import random
 
 __DEBUG__ = True
 
@@ -131,15 +130,3 @@ def lorawan_pkt(data, data_length):
 
 modem = radio.get_modem()
 # modem.calibrate()
-
-# while True:
-#    # msg=b'counter:{}'.format(frame_counter)
-#
-#   # Generar datos aleatorios de temperatura y humedad
-#    temp = round(random.uniform(20.0, 30.0), 2)  # Por ejemplo, entre 20°C y 30°C
-#    humedad = random.randint(30, 70)  # Por ejemplo, entre 30% y 70%
-#
-#   # Crear el mensaje con los datos generados
-#    msg = b'Dispositivo: Ruuvi sensor, Temp: {}C, Humedad: {}%'.format(temp, humedad)
-#    send_data(msg)
-#    time.sleep(10)
