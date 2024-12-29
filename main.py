@@ -24,6 +24,11 @@ def pack_pressure(pressure):
     return pack("!H", pres_conv)
 
 
+def pack_std(std):
+    std_conv = round(std / 0.005)
+    return pack("!H", std_conv)
+
+
 def pack_latitude(latitude_str):
     coord, hemi = latitude_str.split("°")
     decimal_lat = float(coord.strip())
@@ -177,7 +182,7 @@ def main(scan_interval, send_interval):
                             pack_pressure(pres_stats[0]) +
                             pack_pressure(pres_stats[1]) +
                             pack_pressure(pres_stats[2]) +
-                            pack_pressure(pres_stats[3]) +
+                            pack_std(pres_stats[3]) +
                             pack_latitude(gps_data['latitude']) +
                             pack_longitude(gps_data['longitude']) +
                             pack_altitude(gps_data['altitude']) +
