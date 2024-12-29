@@ -209,7 +209,6 @@ def main(scan_interval, send_interval):
         print("Scanning manually stopped.")
 
 
-
 if __name__ == "__main__":
     oled.fill(0)
     oled.text("Initializing...", 0, 0)
