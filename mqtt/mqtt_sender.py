@@ -12,7 +12,6 @@ import time
 from mqtt.umqttsimple import MQTTClient
 from wifi.connectWifi import connect_wifi
 
-# Parameters
 wifiSSID = "PeredaSerrano"
 wifiPass = "torrejonWificasa"
 mqttServer = b"apiict00.etsii.upm.es"
@@ -30,11 +29,9 @@ if connect_wifi(wifiSSID, wifiPass):
     while True:
         time.sleep(20)
 
-        # Datos constantes de prueba
         Temperatura = 27
         Humedad = 60
 
-        # Publicar los datos
         client.publish(topic=mqttTopicTemp, msg=str(Temperatura))
         time.sleep(2)
 

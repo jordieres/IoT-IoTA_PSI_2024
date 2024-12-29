@@ -10,10 +10,10 @@ import time
 
 
 def connect_wifi(net, password):
-    wlan = network.WLAN(network.STA_IF)  # create station interface
+    wlan = network.WLAN(network.STA_IF)
     if not wlan.isconnected():
         wlan.active(True)
-        wlan.connect(net, password)  # connect to an AP
+        wlan.connect(net, password)
         print('Connecting to the network', net + "...")
         timeout = time.time()
         while not wlan.isconnected():

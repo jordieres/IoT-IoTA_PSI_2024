@@ -10,7 +10,6 @@ import time
 from mqtt.umqttsimple import MQTTClient
 from wifi.connectWifi import connect_wifi
 
-# Parametros
 wifiSSID = "PeredaSerrano"
 wifiPass = "torrejonWificasa"
 mqttServer = '138.100.82.170'  # b"apiict00.etsii.upm.es"
@@ -25,15 +24,13 @@ if connect_wifi(wifiSSID, wifiPass):
                         keepalive=7200, ssl=False)
     client.connect()
 
-    # Inicializar contador de temperatura
     temperatura = 1
 
     while True:
         time.sleep(20)
 
-        # Publicar los datos incrementales
         client.publish(topic=mqttTopic, msg=str(temperatura))
-        temperatura += 1  # Incrementar la temperatura
+        temperatura += 1
         time.sleep(2)
 
         print(f"Data sent to MQTT Broker: {temperatura - 1}")

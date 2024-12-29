@@ -1,3 +1,14 @@
+"""
+File Name: radio.py
+Author: Irene Pereda Serrano
+Created On: 29/10/2024
+Description: This file configures and initializes the LoRa modem (SX1262) for
+             communication using SPI. It sets parameters such as frequency,
+             spreading factor, bandwidth, coding rate, preamble length, and
+             output power. The function `get_modem` returns a configured modem
+             instance ready for use.
+"""
+
 from machine import SPI, Pin
 from lora.sx126x import SX1262
 import heltec

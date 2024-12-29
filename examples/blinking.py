@@ -17,8 +17,6 @@ def blink(duration, qty, npin):
 
     led = machine.Pin(npin, machine.Pin.OUT)
 
-    # Cycle to control flashing
-
     for x in range(qty):
         led.on()
         time.sleep_ms(duration)

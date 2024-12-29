@@ -1,81 +1,29 @@
+"""
+File Name: main.py
+Author: Irene Pereda Serrano
+Created On: 29/12/2024
+Description: Main script for collecting temperature, humidity, and pressure data from RuuviTag sensors,
+             retrieving GPS data, and transmitting the processed statistics to TTN (The Things Network)
+             via LoRaWAN.
+"""
+
 import time
 from ruuvitag import core
 from loraWan import lorawan
-from ustruct import pack
 from oled import oledSetup
 from gps.gps import initialize_gps
+from utils import pack_temp as pack_temp
+from utils import pack_humid as pack_humid
+from utils import pack_pressure as pack_pressure
+from utils import pack_std as pack_std
+from utils import calculate_statistics as calculate_statistics
+from utils import pack_latitude as pack_latitude
+from utils import pack_longitude as pack_longitude
+from utils import pack_altitude as pack_altitude
+from utils import pack_hdop as pack_hdop
+from utils import pack_satellites as pack_satellites
 
 oled = oledSetup.oled
-
-
-# Functions to pack sensor data
-def pack_temp(temp):
-    temp_conv = round(temp / 0.005)
-    return pack("!h", temp_conv)
-
-
-def pack_humid(hum):
-    hum_conv = round(hum / 0.0025)
-    return pack("!H", hum_conv)
-
-
-def pack_pressure(pressure):
-    pres_conv = round(pressure / 10.0)
-    return pack("!H", pres_conv)
-
-
-def pack_std(std):
-    std_conv = round(std / 0.005)
-    return pack("!H", std_conv)
-
-
-def pack_latitude(latitude_str):
-    coord, hemi = latitude_str.split("°")
-    decimal_lat = float(coord.strip())
-    if hemi.strip() == 'S':
-        decimal_lat = -decimal_lat
-    return pack("!i", int(decimal_lat * 10 ** 6))
-
-
-def pack_longitude(longitude_str):
-    coord, hemi = longitude_str.split("°")
-    decimal_lon = float(coord.strip())
-    if hemi.strip() == 'W':
-        decimal_lon = -decimal_lon
-    return pack("!i", int(decimal_lon * 10 ** 6))
-
-
-def pack_altitude(altitude):
-    return pack("!H", int(altitude))
-
-
-def pack_satellites(satellites):
-    return pack("!B", satellites)
-
-
-def pack_hdop(hdop):
-    hdop_scaled = int(hdop * 100)
-    return pack("!B", hdop_scaled)
-
-
-# Utility functions
-def mean(data):
-    return sum(data) / len(data) if data else 0
-
-
-def stdev(data):
-    if len(data) <= 1:
-        return 0
-    avg = mean(data)
-    variance = sum((x - avg) ** 2 for x in data) / len(data)
-    return variance ** 0.5
-
-
-def calculate_statistics(data):
-    """Calculate max, min, mean, and standard deviation for a list of data."""
-    if not data:
-        return 0, 0, 0, 0
-    return max(data), min(data), mean(data), stdev(data)
 
 
 def display_countdown(remaining_time):
@@ -88,7 +36,7 @@ def display_countdown(remaining_time):
 
 
 def get_valid_gps_data(gps_handler, max_attempts=10):
-    """Intenta obtener datos GPS válidos en un número limitado de intentos."""
+    """Attempts to obtain valid GPS data in a limited number of attempts"""
     print("Checking GPS data validity...")
     for attempt in range(max_attempts):
         gps_handler.read_gps_data()
@@ -98,9 +46,8 @@ def get_valid_gps_data(gps_handler, max_attempts=10):
             return gps_data
         else:
             print(f"Invalid GPS data on attempt {attempt + 1}. Retrying...")
-        time.sleep(1)  # Pequeño retraso entre intentos
+        time.sleep(1)
 
-    # Si no se obtienen datos válidos, devuelve valores predeterminados
     print("No valid GPS data obtained after retries. Setting default values.")
     return {
         'latitude': "0.0000° N",
