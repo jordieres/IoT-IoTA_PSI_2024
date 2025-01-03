@@ -1,3 +1,14 @@
+"""
+File Name: api.py
+Author: Irene Pereda Serrano
+Created On: 28/12/2024
+Description: This file contains functions to interact with the IOTA Tangle via a Hornet node API.
+             It includes functionalities to retrieve node information, check node health, get API
+             routes, fetch tips, and submit blocks with tagged data. Additionally, it generates
+             random temperature and humidity data for testing purposes and connects to Wi-Fi
+             for network access.
+"""
+
 import urequests as requests
 import urandom
 import ujson as json
@@ -6,13 +17,13 @@ from wifi.connectWifi import connect_wifi
 
 def get_node_info(base_url):
     """
-    Obtiene la información del nodo IOTA.
+    Gets the IOTA node information
 
     Args:
-        base_url (str): URL base del nodo
+        base_url (str): base URL of the node
 
     Returns:
-        dict: Información del nodo en formato JSON, o None si hubo un error.
+        dict: Node information in JSON format, or None if there was an error
     """
     url = f"{base_url}/api/core/v2/info"
     try:
@@ -30,13 +41,13 @@ def get_node_info(base_url):
 
 def get_health(base_url):
     """
-    Verifica el estado de salud del nodo IOTA.
+    Checks the health status of the IOTA node.
 
     Args:
-        base_url (str): URL base del nodo.
+        base_url (str): base URL of the node
 
     Returns:
-        bool: True si el nodo está saludable, False en caso contrario.
+        bool: True if the node is healthy, False otherwise
     """
     url = f"{base_url}/health"
     try:
@@ -54,13 +65,13 @@ def get_health(base_url):
 
 def get_api_routes(base_url):
     """
-    Obtiene las rutas disponibles en la API del nodo.
+    Gets the routes available in the node API
 
     Args:
-        base_url (str): URL base del nodo.
+        base_url (str): base URL of the node
 
     Returns:
-        list: Lista de rutas disponibles en la API.
+        list: List of routes available in the API
     """
     url = f"{base_url}/api/routes"
     try:
@@ -78,10 +89,10 @@ def get_api_routes(base_url):
 
 def get_tips(api_url):
     """
-    Obtiene tips válidos del nodo.
+    Get valid tips from the node
 
-    :param api_url: La URL de la API del nodo Hornet.
-    :return: Una lista de tips (IDs de bloques) o None si falla.
+    :param api_url: The URL of the Hornet node API
+    :return: A list of tips (block IDs) or None if this fails
     """
     try:
         response = requests.get(f"{api_url}/tips")
@@ -98,23 +109,23 @@ def get_tips(api_url):
 
 def generate_random_data():
     """
-    Genera datos aleatorios de temperatura y humedad en formato JSON.
+    Generates random temperature and humidity data in JSON format
 
-    :return: Una cadena JSON con los datos generados.
+    :return: A JSON string containing the generated data
     """
-    temperature = round((urandom.getrandbits(8) % 15) + 15, 2)  # Rango 15.0 a 30.0
-    humidity = round((urandom.getrandbits(8) % 60) + 30, 2)  # Rango 30.0 a 90.0
+    temperature = round((urandom.getrandbits(8) % 15) + 15, 2)
+    humidity = round((urandom.getrandbits(8) % 60) + 30, 2)
     data = {"temperature": temperature, "humidity": humidity}
     return json.dumps(data)
 
 
 def submit_block_with_tagged_data(api_url, tag, data):
     """
-    Envía un bloque al Tangle con un TaggedDataPayload.
+    Sends a block to the Tangle with a TaggedDataPayload
 
-    :param api_url: La URL de la API del nodo Hornet.
-    :param tag: Etiqueta para los datos en formato hexadecimal.
-    :param data: Datos en formato de cadena que se codificarán en hexadecimal.
+    :param api_url: The API URL for the Hornet node
+    :param tag: Label for data in hexadecimal format
+    :param data: Data in string format to be encoded in hexadecimal
     """
     hex_tag = "0x" + tag.encode().hex()
     hex_data = "0x" + data.encode().hex()
@@ -150,16 +161,12 @@ def submit_block_with_tagged_data(api_url, tag, data):
         print(f"Error al conectar con el nodo: {e}")
 
 
-# URL de la API del nodo
 API_URL = "https://iota.etsii.upm.es/api/core/v2"
 
-# Etiqueta para los datos
-TAG = "TemperatureHumidity"
+TAG = "UPM#APII#001"
 
-# Generar datos aleatorios de temperatura y humedad
 DATA = generate_random_data()
 
-# Configuración de red Wi-Fi
 WIFI_SSID = "PeredaSerrano"
 WIFI_PASSWORD = "torrejonWificasa"
 

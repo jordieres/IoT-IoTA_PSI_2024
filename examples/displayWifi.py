@@ -13,6 +13,5 @@ oled = oledSetup.oled
 if connectWifi.connect_wifi("PeredaSerrano", "TorrejonWifiCasa"):
     oled.fill(0)
     oled.text('CONECTADO A IP:', 0, 0)
-    # oled.text(wlan.ifconfig()[0], 0, 25)
     oled.text('HELLO WiFi ESP32', 0, 55)
     oled.show()
