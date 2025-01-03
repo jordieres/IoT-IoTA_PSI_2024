@@ -163,7 +163,7 @@ def submit_block_with_tagged_data(api_url, tag, data):
 
 API_URL = "https://iota.etsii.upm.es/api/core/v2"
 
-TAG = "TemperatureHumidity"
+TAG = "UPM#APII#001"
 
 DATA = generate_random_data()
 
