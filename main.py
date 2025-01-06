@@ -125,7 +125,8 @@ def main(scan_interval, send_interval):
                 gps_raw = get_valid_gps_data(gps_handler)
 
                 if gps_raw:
-                    epoch_time = convert_to_epoch(gps_raw['timestamp'], gps_raw['date'])
+                    print(f"GPS raw: {gps_raw}")
+                    epoch_time = convert_to_epoch(gps_raw['timestamp'], gps_raw['date'], local_offset=1)
                     lat = parse_latitude(gps_raw['latitude'])
                     lon = parse_longitude(gps_raw['longitude'])
 

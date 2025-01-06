@@ -164,7 +164,6 @@ def filter_outliers_by_distance(gps_data, threshold_percentile=95):
     if len(gps_data) < 2:
         return gps_data
 
-    # Calculate distances between consecutive points
     distances = [
         haversine(
             gps_data[i - 1]["X"], gps_data[i - 1]["Y"],
@@ -173,25 +172,24 @@ def filter_outliers_by_distance(gps_data, threshold_percentile=95):
         for i in range(1, len(gps_data))
     ]
 
-    # Determine the distance threshold for outliers
     threshold = calculate_percentile(distances, threshold_percentile)
 
-    # Filter out points based on distance threshold
-    filtered_data = [gps_data[0]]  # Always keep the first point
+    filtered_data = [gps_data[0]]
     for i in range(1, len(gps_data)):
         if distances[i - 1] <= threshold:
             filtered_data.append(gps_data[i])
     return filtered_data
 
 
-def convert_to_epoch(timestamp, date):
+def convert_to_epoch(timestamp, date, local_offset=0):
     """
     Convert GPS timestamp and date to epoch time.
     :param timestamp: List [hour, minute, second]
     :param date: String with format "January 4th, 2025"
+    :param local_offset: Time zone difference to UTC in hours
     :return: Epoch time as an integer
     """
-    # Parse the date string
+
     months = {
         "January": 1, "February": 2, "March": 3, "April": 4, "May": 5,
         "June": 6, "July": 7, "August": 8, "September": 9, "October": 10,
@@ -205,13 +203,11 @@ def convert_to_epoch(timestamp, date):
     timestamp = [int(float(x)) for x in timestamp]
     hour, minute, second = map(int, timestamp)
 
-    # Create the tuple for mktime
     tm = (year, month, day, hour, minute, second, 0, 0)
 
-    # Convert to epoch time
     try:
         epoch_time = mktime(tm)
-        return epoch_time + 946681200
+        return epoch_time + 946681200 + local_offset * 3600
     except Exception as e:
         print(f"Error converting to epoch time: {e}")
         return None
