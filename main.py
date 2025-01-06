@@ -12,16 +12,20 @@ from ruuvitag import core
 from loraWan import lorawan
 from oled import oledSetup
 from gps.gps import initialize_gps
-from utils import pack_temp as pack_temp
-from utils import pack_humid as pack_humid
-from utils import pack_pressure as pack_pressure
-from utils import pack_std as pack_std
-from utils import calculate_statistics as calculate_statistics
-from utils import pack_latitude as pack_latitude
-from utils import pack_longitude as pack_longitude
-from utils import pack_altitude as pack_altitude
-from utils import pack_hdop as pack_hdop
-from utils import pack_satellites as pack_satellites
+from utils import (
+    pack_temp,
+    pack_humid,
+    pack_pressure,
+    pack_std,
+    pack_coordinate,
+    pack_timestamp,
+    convert_to_epoch,
+    parse_latitude,
+    parse_longitude,
+    calculate_statistics,
+    filter_outliers_by_distance,
+    adjust_threshold_percentile,
+)
 
 oled = oledSetup.oled
 
@@ -42,7 +46,6 @@ def get_valid_gps_data(gps_handler, max_attempts=10):
         gps_handler.read_gps_data()
         gps_data = gps_handler.get_gps_info()
         if gps_data and gps_data['satellites_in_use'] >= 3 and gps_data['hdop'] <= 10:
-            print(f"Valid GPS data obtained on attempt {attempt + 1}: {gps_data}")
             return gps_data
         else:
             print(f"Invalid GPS data on attempt {attempt + 1}. Retrying...")
@@ -66,6 +69,21 @@ def main(scan_interval, send_interval):
     humidity_data = []
     pressure_data = []
 
+    gps_data_last_minute = []
+    gps_representative_positions = []
+    gps_data_last_three_minutes = []
+
+    gps_sample_interval = 20
+    outlier_filter_interval = 60
+    last_gps_sample_time = time.time()
+    last_outlier_filter_time = time.time()
+
+    last_send_time = time.time()
+    last_scan_time = time.time()
+
+    gps_reference_timestamp = None
+    start_time_relative = None
+
     def display_message(lines, delay=2):
         oled.fill(0)
         for i, line in enumerate(lines):
@@ -79,78 +97,132 @@ def main(scan_interval, send_interval):
             temperature_data.append(data.temperature)
             humidity_data.append(data.humidity)
             pressure_data.append(data.pressure)
-
             display_message(["Data received"])
-
-            print(f"Sensor data: Temp={data.temperature} C, Hum={data.humidity}%, Press={data.pressure} hPa")
+            # print(f"Sensor data: Temp={data.temperature} C, Hum={data.humidity}%, Press={data.pressure} Pa")
 
     ruuvi._callback_handler = callback_handler
-
-    last_send_time = time.time()  # Last time data was sent via LoRa
-    last_scan_time = time.time()  # Last time BLE scanning was performed
 
     try:
         while True:
             current_time = time.time()
+
+            # Calculate the current epoch time based on GPS reference
+            if gps_reference_timestamp is not None:
+                current_epoch_time = gps_reference_timestamp + (current_time - start_time_relative)
+            else:
+                current_epoch_time = None  # Before GPS is synced
+
             time_to_next_send = int(send_interval - (current_time - last_send_time))
 
             if time_to_next_send > 0:
                 display_countdown(time_to_next_send)
 
+            # Muestreo de sensores BLE
             if current_time - last_scan_time >= scan_interval:
-                print("Scanning Ruuvi sensors...")
+                # print("Scanning Ruuvi sensors...")
                 display_message(["Scanning...", "Ruuvi sensors"])
                 ruuvi.scan()
                 last_scan_time = current_time
 
+            # Muestreo de GPS
+            if current_time - last_gps_sample_time >= gps_sample_interval:
+                gps_raw = get_valid_gps_data(gps_handler)
+
+                if gps_raw:
+                    epoch_time = convert_to_epoch(gps_raw['timestamp'], gps_raw['date'])
+                    lat = parse_latitude(gps_raw['latitude'])
+                    lon = parse_longitude(gps_raw['longitude'])
+
+                    gps_data_last_minute.append({'t': epoch_time, 'X': lat, 'Y': lon})
+                    print(f"GPS data added to last minute: {gps_data_last_minute}")
+
+                    # Configurar el primer timestamp GPS válido como referencia
+                    if gps_reference_timestamp is None:
+                        gps_reference_timestamp = epoch_time
+                        start_time_relative = time.time()
+
+                last_gps_sample_time = current_time
+
+            # Filtrar outliers y determinar posición representativa cada minuto
+            if current_time - last_outlier_filter_time >= outlier_filter_interval:
+                # Calcular threshold dinámico
+                threshold = adjust_threshold_percentile(gps_data_last_three_minutes)
+                print(f"Dynamic threshold: ", threshold)
+
+                # Filtrar outliers del último minuto
+                gps_data_filtered = filter_outliers_by_distance(gps_data_last_minute, threshold)
+                print(f"Filtered GPS data: {gps_data_filtered}")
+
+                # Actualizar lista de últimos 3 minutos con datos filtrados
+                gps_data_last_three_minutes.extend(gps_data_filtered)
+
+                # Agregar la última posición filtrada como representativa del minuto actual
+                if gps_data_filtered:
+                    gps_representative_positions.append(gps_data_filtered[-1])
+
+                print(f"Current time: ", current_epoch_time)
+                for j in gps_data_last_three_minutes:
+                    print(f"Data time: ", j['t'])
+
+                # Filtrar datos GPS más antiguos a 3 minutos
+                gps_data_last_three_minutes = [
+                    data for data in gps_data_last_three_minutes
+                    if data['t'] >= current_epoch_time - 180  # Mantener datos de los últimos 3 minutos
+                ]
+
+                print(f"GPS data for last 3 minutes: {gps_data_last_three_minutes}")
+
+                gps_data_last_minute.clear()
+                last_outlier_filter_time = current_time
+
+            # Enviar datos cada `send_interval`
             if current_time - last_send_time >= send_interval:
                 print("Preparing data to send to TTN...")
 
                 temp_stats = calculate_statistics(temperature_data)
                 hum_stats = calculate_statistics(humidity_data)
                 pres_stats = calculate_statistics(pressure_data)
+                print(f"GPS data to TTN: {gps_representative_positions}")
 
-                gps_data = get_valid_gps_data(gps_handler)
+                environmental_payload = (
+                        pack_temp(temp_stats[0]) +
+                        pack_temp(temp_stats[1]) +
+                        pack_temp(temp_stats[2]) +
+                        pack_temp(temp_stats[3]) +
+                        pack_humid(hum_stats[0]) +
+                        pack_humid(hum_stats[1]) +
+                        pack_humid(hum_stats[2]) +
+                        pack_humid(hum_stats[3]) +
+                        pack_pressure(pres_stats[0]) +
+                        pack_pressure(pres_stats[1]) +
+                        pack_pressure(pres_stats[2]) +
+                        pack_std(pres_stats[3])
+                )
 
-                if all(stat is not None for stat in temp_stats) and all(stat is not None for stat in hum_stats) and all(
-                        stat is not None for stat in pres_stats):
-                    payload = (
-                            pack_temp(temperature_data[-1]) +
-                            pack_humid(humidity_data[-1]) +
-                            pack_pressure(pressure_data[-1]) +
-                            pack_temp(temp_stats[0]) +
-                            pack_temp(temp_stats[1]) +
-                            pack_temp(temp_stats[2]) +
-                            pack_temp(temp_stats[3]) +
-                            pack_humid(hum_stats[0]) +
-                            pack_humid(hum_stats[1]) +
-                            pack_humid(hum_stats[2]) +
-                            pack_humid(hum_stats[3]) +
-                            pack_pressure(pres_stats[0]) +
-                            pack_pressure(pres_stats[1]) +
-                            pack_pressure(pres_stats[2]) +
-                            pack_std(pres_stats[3]) +
-                            pack_latitude(gps_data['latitude']) +
-                            pack_longitude(gps_data['longitude']) +
-                            pack_altitude(gps_data['altitude']) +
-                            pack_satellites(gps_data['satellites_in_use']) +
-                            pack_hdop(gps_data['hdop'])
-                    )
+                gps_payload = b"".join([
+                    pack_timestamp(gps['t']) +
+                    pack_coordinate(gps['X']) +
+                    pack_coordinate(gps['Y'])
+                    for gps in gps_representative_positions
+                ])
 
-                    display_message(["Sending data...", "To TTN"])
-                    try:
-                        lorawan.send_data(payload)
-                        display_message(["Data sent!", "Successfully"])
-                        print("Data sent to TTN successfully.")
-                    except Exception as e:
-                        display_message(["Error sending", "data to TTN"])
-                        print(f"Error sending data to TTN: {e}")
-                else:
-                    print("Insufficient data for creating payload.")
+                gps_count = len(gps_representative_positions).to_bytes(1, 'big')
+
+                payload = environmental_payload + gps_count + gps_payload
+                display_message(["Sending data...", "To TTN"])
+
+                try:
+                    lorawan.send_data(payload)
+                    display_message(["Data sent!", "Successfully"])
+                    print("Data sent to TTN successfully.")
+                except Exception as e:
+                    display_message(["Error sending", "data to TTN"])
+                    print(f"Error sending data to TTN: {e}")
 
                 temperature_data.clear()
                 humidity_data.clear()
                 pressure_data.clear()
+                gps_representative_positions.clear()
 
                 last_send_time = current_time
 

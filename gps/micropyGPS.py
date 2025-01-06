@@ -41,7 +41,7 @@ class MicropyGPS(object):
     def __init__(self, local_offset=0, location_formatting='dd'):
         """
         Setup GPS Object Status Flags, Internal Data Registers, etc
-            local_offset (int): Timzone Difference to UTC
+            local_offset (int): Time zone Difference to UTC
             location_formatting (str): Style For Presenting Longitude/Latitude:
                                        Decimal Degree Minute (ddm) - 40° 26.767′ N
                                        Degrees Minutes Seconds (dms) - 40° 26′ 46″ N
