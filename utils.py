@@ -30,6 +30,34 @@ def pack_std(std):
     return pack("!H", std_conv)
 
 
+def pack_environmental_data(temp_stats, hum_stats, pres_stats):
+    """
+    Packs all environmental statistics (temperature, humidity, pressure) into a single payload.
+
+    Args:
+        temp_stats (tuple): Max, min, mean, and std deviation for temperature.
+        hum_stats (tuple): Max, min, mean, and std deviation for humidity.
+        pres_stats (tuple): Max, min, mean, and std deviation for pressure.
+
+    Returns:
+        bytes: Packed payload containing all environmental data.
+    """
+    return (
+            pack_temp(temp_stats[0]) +
+            pack_temp(temp_stats[1]) +
+            pack_temp(temp_stats[2]) +
+            pack_temp(temp_stats[3]) +
+            pack_humid(hum_stats[0]) +
+            pack_humid(hum_stats[1]) +
+            pack_humid(hum_stats[2]) +
+            pack_humid(hum_stats[3]) +
+            pack_pressure(pres_stats[0]) +
+            pack_pressure(pres_stats[1]) +
+            pack_pressure(pres_stats[2]) +
+            pack_std(pres_stats[3])
+    )
+
+
 def pack_timestamp(epoch_time):
     return pack("!I", epoch_time)
 
@@ -38,12 +66,27 @@ def pack_coordinate(value):
     return pack("!i", int(value * 10 ** 6))
 
 
-def pack_gps_data(gps_data):
-    return (
-            pack_timestamp(gps_data["t"]) +
-            pack_coordinate(gps_data["X"]) +
-            pack_coordinate(gps_data["Y"])
-    )
+def pack_gps_data(gps_positions):
+    """
+    Packs GPS data into a single payload.
+
+    Args:
+        gps_positions (list): List of dictionaries, each containing:
+            - 't': Timestamp
+            - 'X': Latitude
+            - 'Y': Longitude
+
+    Returns:
+        tuple: A tuple containing the packed payload and the count of GPS positions.
+    """
+    gps_payload = b"".join([
+        pack_timestamp(gps['t']) +
+        pack_coordinate(gps['X']) +
+        pack_coordinate(gps['Y'])
+        for gps in gps_positions
+    ])
+    gps_count = len(gps_positions).to_bytes(1, 'big')  # Encode the count as a single byte
+    return gps_count + gps_payload
 
 
 def mean(data):

@@ -13,12 +13,8 @@ from loraWan import lorawan
 from oled import oledSetup
 from gps.gps import initialize_gps
 from utils import (
-    pack_temp,
-    pack_humid,
-    pack_pressure,
-    pack_std,
-    pack_coordinate,
-    pack_timestamp,
+    pack_environmental_data,
+    pack_gps_data,
     convert_to_epoch,
     parse_latitude,
     parse_longitude,
@@ -184,31 +180,10 @@ def main(scan_interval, send_interval):
                 pres_stats = calculate_statistics(pressure_data)
                 print(f"GPS data to TTN: {gps_representative_positions}")
 
-                environmental_payload = (
-                        pack_temp(temp_stats[0]) +
-                        pack_temp(temp_stats[1]) +
-                        pack_temp(temp_stats[2]) +
-                        pack_temp(temp_stats[3]) +
-                        pack_humid(hum_stats[0]) +
-                        pack_humid(hum_stats[1]) +
-                        pack_humid(hum_stats[2]) +
-                        pack_humid(hum_stats[3]) +
-                        pack_pressure(pres_stats[0]) +
-                        pack_pressure(pres_stats[1]) +
-                        pack_pressure(pres_stats[2]) +
-                        pack_std(pres_stats[3])
-                )
+                environmental_payload = pack_environmental_data(temp_stats, hum_stats, pres_stats)
+                gps_payload = pack_gps_data(gps_representative_positions)
 
-                gps_payload = b"".join([
-                    pack_timestamp(gps['t']) +
-                    pack_coordinate(gps['X']) +
-                    pack_coordinate(gps['Y'])
-                    for gps in gps_representative_positions
-                ])
-
-                gps_count = len(gps_representative_positions).to_bytes(1, 'big')
-
-                payload = environmental_payload + gps_count + gps_payload
+                payload = environmental_payload + gps_payload
                 display_message(["Sending data...", "To TTN"])
 
                 try:
