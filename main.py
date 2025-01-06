@@ -94,7 +94,6 @@ def main(scan_interval, send_interval):
             humidity_data.append(data.humidity)
             pressure_data.append(data.pressure)
             display_message(["Data received"])
-            # print(f"Sensor data: Temp={data.temperature} C, Hum={data.humidity}%, Press={data.pressure} Pa")
 
     ruuvi._callback_handler = callback_handler
 
@@ -125,7 +124,6 @@ def main(scan_interval, send_interval):
                 gps_raw = get_valid_gps_data(gps_handler)
 
                 if gps_raw:
-                    print(f"GPS raw: {gps_raw}")
                     epoch_time = convert_to_epoch(gps_raw['timestamp'], gps_raw['date'], local_offset=1)
                     lat = parse_latitude(gps_raw['latitude'])
                     lon = parse_longitude(gps_raw['longitude'])
@@ -140,7 +138,7 @@ def main(scan_interval, send_interval):
 
                 last_gps_sample_time = current_time
 
-            # Filtrar outliers y determinar posición representativa cada minuto
+            # Filtrar outliers y determinar posición representativa
             if current_time - last_outlier_filter_time >= outlier_filter_interval:
                 # Calcular threshold dinámico
                 threshold = adjust_threshold_percentile(gps_data_last_three_minutes)
@@ -164,7 +162,7 @@ def main(scan_interval, send_interval):
                 # Filtrar datos GPS más antiguos a 3 minutos
                 gps_data_last_three_minutes = [
                     data for data in gps_data_last_three_minutes
-                    if data['t'] >= current_epoch_time - 180  # Mantener datos de los últimos 3 minutos
+                    if data['t'] >= current_epoch_time - 180
                 ]
 
                 print(f"GPS data for last 3 minutes: {gps_data_last_three_minutes}")
