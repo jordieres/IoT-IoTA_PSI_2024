@@ -183,6 +183,7 @@ def main(scan_interval, send_interval):
                 gps_payload = pack_gps_data(gps_representative_positions)
 
                 payload = environmental_payload + gps_payload
+                print(f"Payload: ", payload)
                 display_message(["Sending data...", "To TTN"])
 
                 try:
