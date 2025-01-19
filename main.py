@@ -41,7 +41,8 @@ def get_valid_gps_data(gps_handler, max_attempts=10):
     for attempt in range(max_attempts):
         gps_handler.read_gps_data()
         gps_data = gps_handler.get_gps_info()
-        if gps_data and gps_data['satellites_in_use'] >= 3 and gps_data['hdop'] <= 10:
+
+        if gps_data:
             return gps_data
         else:
             print(f"Invalid GPS data on attempt {attempt + 1}. Retrying...")
@@ -100,21 +101,18 @@ def main(scan_interval, send_interval):
     try:
         while True:
             current_time = time.time()
+            time_to_next_send = int(send_interval - (current_time - last_send_time))
+            if time_to_next_send > 0:
+                display_countdown(time_to_next_send)
 
             # Calculate the current epoch time based on GPS reference
             if gps_reference_timestamp is not None:
                 current_epoch_time = gps_reference_timestamp + (current_time - start_time_relative)
             else:
-                current_epoch_time = None  # Before GPS is synced
-
-            time_to_next_send = int(send_interval - (current_time - last_send_time))
-
-            if time_to_next_send > 0:
-                display_countdown(time_to_next_send)
+                current_epoch_time = None
 
             # Muestreo de sensores BLE
             if current_time - last_scan_time >= scan_interval:
-                # print("Scanning Ruuvi sensors...")
                 display_message(["Scanning...", "Ruuvi sensors"])
                 ruuvi.scan()
                 last_scan_time = current_time
@@ -122,7 +120,7 @@ def main(scan_interval, send_interval):
             # Muestreo de GPS
             if current_time - last_gps_sample_time >= gps_sample_interval:
                 gps_raw = get_valid_gps_data(gps_handler)
-
+                print(f"Raw gps data from Neov2m: ", gps_raw)
                 if gps_raw:
                     epoch_time = convert_to_epoch(gps_raw['timestamp'], gps_raw['date'], local_offset=1)
                     lat = parse_latitude(gps_raw['latitude'])
@@ -141,31 +139,46 @@ def main(scan_interval, send_interval):
             # Filtrar outliers y determinar posición representativa
             if current_time - last_outlier_filter_time >= outlier_filter_interval:
                 # Calcular threshold dinámico
-                threshold = adjust_threshold_percentile(gps_data_last_three_minutes)
-                print(f"Dynamic threshold: ", threshold)
+                try:
+                    threshold = adjust_threshold_percentile(gps_data_last_three_minutes)
+                    print(f"Dynamic threshold: {threshold}")
+                except Exception as e:
+                    print(f"Error calculating dynamic threshold: {e}")
+                    threshold = 95
 
                 # Filtrar outliers del último minuto
-                gps_data_filtered = filter_outliers_by_distance(gps_data_last_minute, threshold)
-                print(f"Filtered GPS data: {gps_data_filtered}")
+                if not gps_data_last_minute:
+                    print("gps_data_last_minute is empty!")
+                    gps_data_filtered = []
+                else:
+                    gps_data_filtered = filter_outliers_by_distance(gps_data_last_minute, threshold)
+                    print(f"Filtered GPS data: {gps_data_filtered}")
 
                 # Actualizar lista de últimos 3 minutos con datos filtrados
-                gps_data_last_three_minutes.extend(gps_data_filtered)
+                if gps_data_filtered:
+                    gps_data_last_three_minutes.extend(gps_data_filtered)
+                else:
+                    print("No GPS data filtered to extend into gps_data_last_three_minutes.")
 
                 # Agregar la última posición filtrada como representativa del minuto actual
                 if gps_data_filtered:
                     gps_representative_positions.append(gps_data_filtered[-1])
+                else:
+                    print("No GPS data filtered, skipping representative position update.")
 
                 print(f"Current time: ", current_epoch_time)
                 for j in gps_data_last_three_minutes:
                     print(f"Data time: ", j['t'])
 
                 # Filtrar datos GPS más antiguos a 3 minutos
-                gps_data_last_three_minutes = [
-                    data for data in gps_data_last_three_minutes
-                    if data['t'] >= current_epoch_time - 180
-                ]
-
-                print(f"GPS data for last 3 minutes: {gps_data_last_three_minutes}")
+                if current_epoch_time is not None and gps_data_last_three_minutes:
+                    gps_data_last_three_minutes = [
+                        data for data in gps_data_last_three_minutes
+                        if data['t'] >= current_epoch_time - 180
+                    ]
+                    print(f"GPS data for last 3 minutes: {gps_data_last_three_minutes}")
+                else:
+                    print("gps_data_last_three_minutes is empty, skipping filtering.")
 
                 gps_data_last_minute.clear()
                 last_outlier_filter_time = current_time

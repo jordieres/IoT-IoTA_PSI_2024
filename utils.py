@@ -162,6 +162,7 @@ def filter_outliers_by_distance(gps_data, threshold_percentile=95):
         Filtered list of GPS coordinates without outliers.
     """
     if len(gps_data) < 2:
+        print("Not enough GPS points to filter outliers")
         return gps_data
 
     distances = [
@@ -224,6 +225,7 @@ def adjust_threshold_percentile(gps_data):
         Nuevo valor de `threshold_percentile` (porcentaje) para eliminar outliers.
     """
     if len(gps_data) < 2:
+        print("No hay suficientes datos GPS para calcular la velocidad.")
         return 95
 
     speeds = []
