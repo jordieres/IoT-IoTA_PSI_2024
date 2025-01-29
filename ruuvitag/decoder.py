@@ -9,8 +9,6 @@ Description: This file contains functions for decoding raw data from RuuviTag
 
 
 import ustruct
-import ubinascii
-
 from .format import RuuviTagRAWv1, RuuviTagRAWv2
 
 

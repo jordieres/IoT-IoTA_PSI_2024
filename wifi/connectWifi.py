@@ -2,7 +2,7 @@
 File Name: connectWifi.py
 Author: Irene Pereda Serrano
 Created On: 04/04/2024
-Description: Connecting to the home Wi-Fi network
+Description: This script connects to a WiFi network using MicroPython's network module
 """
 
 import network

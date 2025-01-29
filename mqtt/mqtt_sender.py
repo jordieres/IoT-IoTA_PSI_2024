@@ -4,6 +4,9 @@ Author: Irene Pereda Serrano
 Created On: 05/05/2024
 Description: This file connects to the MQTT Broker defined in MQTT_BROKER and publishes data to
              the specified topic in TOPIC.
+TODO:
+- Fill in the WiFi credentials (wifiSSID, wifiPass)
+- Provide the MQTT broker details (mqttServer, mqttUser, mqttPass, mqttTopicTemp)
 """
 
 import gc
@@ -12,14 +15,14 @@ import time
 from mqtt.umqttsimple import MQTTClient
 from wifi.connectWifi import connect_wifi
 
-wifiSSID = "PeredaSerrano"
-wifiPass = "torrejonWificasa"
-mqttServer = b"apiict00.etsii.upm.es"
+wifiSSID = ""
+wifiPass = ""
+mqttServer = b""
 mqttPort = 1883
 mqttClientID = b"ESP32-S3"
-mqttUser = b"ipereda"
-mqttPass = b"Madrid#141"
-mqttTopicTemp = b"UPM/PrdMon/S001"
+mqttUser = b""
+mqttPass = b""
+mqttTopicTemp = b""
 
 if connect_wifi(wifiSSID, wifiPass):
     client = MQTTClient(client_id=mqttClientID, server=mqttServer, port=mqttPort, user=mqttUser, password=mqttPass,
@@ -41,26 +44,3 @@ if connect_wifi(wifiSSID, wifiPass):
 
 else:
     print("Impossible to connect")
-
-"""
-def send_data(data):
-    # Connect to MQTT Broker and publish data
-    client = MQTTClient("ESP32-S3", mqttServer)
-    client.connect()
-    client.publish(mqttTopicHum, data)
-    client.disconnect()
-    print("Data sent to MQTT Broker:", data)
-
-
-def main():
-    # Connect to the WiFi network
-    connectWifi.connect_wifi()
-
-    # Simulate temperature data
-    temperature_data = "25.5"
-
-    # Send data to MQTT Broker
-    send_data(temperature_data)
-
-
-"""

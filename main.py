@@ -3,8 +3,7 @@ File Name: main.py
 Author: Irene Pereda Serrano
 Created On: 29/12/2024
 Description: Main script for collecting temperature, humidity, and pressure data from RuuviTag sensors,
-             retrieving GPS data, and transmitting the processed statistics to TTN (The Things Network)
-             via LoRaWAN.
+             retrieving GPS data, and transmitting the processed statistics via LoRaWAN
 """
 
 import time
@@ -12,22 +11,22 @@ from ruuvitag import core
 from loraWan import lorawan
 from oled import oledSetup
 from gps.gps import initialize_gps
-from utils import pack_temp as pack_temp
-from utils import pack_humid as pack_humid
-from utils import pack_pressure as pack_pressure
-from utils import pack_std as pack_std
-from utils import calculate_statistics as calculate_statistics
-from utils import pack_latitude as pack_latitude
-from utils import pack_longitude as pack_longitude
-from utils import pack_altitude as pack_altitude
-from utils import pack_hdop as pack_hdop
-from utils import pack_satellites as pack_satellites
+from utils import (
+    pack_environmental_data,
+    pack_gps_data,
+    convert_to_epoch,
+    parse_latitude,
+    parse_longitude,
+    calculate_statistics,
+    filter_outliers_by_distance,
+    adjust_threshold_percentile,
+)
 
 oled = oledSetup.oled
 
 
 def display_countdown(remaining_time):
-    """Display the countdown on the OLED screen."""
+    """Display the countdown on the OLED screen"""
     minutes, seconds = divmod(remaining_time, 60)
     oled.fill(0)
     oled.text("Next TTN send:", 0, 0)
@@ -37,25 +36,29 @@ def display_countdown(remaining_time):
 
 def get_valid_gps_data(gps_handler, max_attempts=10):
     """Attempts to obtain valid GPS data in a limited number of attempts"""
-    print("Checking GPS data validity...")
-    for attempt in range(max_attempts):
-        gps_handler.read_gps_data()
-        gps_data = gps_handler.get_gps_info()
-        if gps_data and gps_data['satellites_in_use'] >= 3 and gps_data['hdop'] <= 10:
-            print(f"Valid GPS data obtained on attempt {attempt + 1}: {gps_data}")
-            return gps_data
-        else:
-            print(f"Invalid GPS data on attempt {attempt + 1}. Retrying...")
-        time.sleep(1)
+    try:
+        print("Checking GPS data validity...")
+        for attempt in range(max_attempts):
+            gps_handler.read_gps_data()
+            gps_data = gps_handler.get_gps_info()
 
-    print("No valid GPS data obtained after retries. Setting default values.")
-    return {
-        'latitude': "0.0000° N",
-        'longitude': "0.0000° E",
-        'altitude': 0,
-        'satellites_in_use': 0,
-        'hdop': 99.99,
-    }
+            if gps_data:
+                return gps_data
+
+            time.sleep(1)
+
+        print("No valid GPS data obtained after retries. Setting default values.")
+        return {
+            'latitude': "0.0000° N",
+            'longitude': "0.0000° E",
+            'altitude': 0,
+            'satellites_in_use': 0,
+            'hdop': 99.99,
+            'timestamp': [0, 0, 0],
+            'date': "January 0th, 2000",
+        }
+    except Exception as e:
+        print(f"An error occurred in get_valid_gps_data(): {e}")
 
 
 def main(scan_interval, send_interval):
@@ -66,6 +69,21 @@ def main(scan_interval, send_interval):
     humidity_data = []
     pressure_data = []
 
+    gps_data_last_minute = []
+    gps_representative_positions = []
+    gps_data_last_three_minutes = []
+
+    gps_sample_interval = 20
+    outlier_filter_interval = 60
+
+    last_gps_sample_time = time.time()
+    last_outlier_filter_time = time.time()
+    last_send_time = time.time()
+    last_scan_time = time.time()
+
+    gps_reference_timestamp = None
+    start_time_relative = None
+
     def display_message(lines, delay=2):
         oled.fill(0)
         for i, line in enumerate(lines):
@@ -74,70 +92,102 @@ def main(scan_interval, send_interval):
         time.sleep(delay)
 
     def callback_handler(data):
-        """Process the received RuuviTag data and store it temporarily."""
+        """Process the received RuuviTag data and store it temporarily"""
         if data:
             temperature_data.append(data.temperature)
             humidity_data.append(data.humidity)
             pressure_data.append(data.pressure)
-
             display_message(["Data received"])
-
-            print(f"Sensor data: Temp={data.temperature} C, Hum={data.humidity}%, Press={data.pressure} hPa")
 
     ruuvi._callback_handler = callback_handler
 
-    last_send_time = time.time()  # Last time data was sent via LoRa
-    last_scan_time = time.time()  # Last time BLE scanning was performed
-
-    try:
-        while True:
+    while True:
+        try:
             current_time = time.time()
             time_to_next_send = int(send_interval - (current_time - last_send_time))
-
             if time_to_next_send > 0:
                 display_countdown(time_to_next_send)
 
-            if current_time - last_scan_time >= scan_interval:
-                print("Scanning Ruuvi sensors...")
-                display_message(["Scanning...", "Ruuvi sensors"])
-                ruuvi.scan()
-                last_scan_time = current_time
+            # Calculate the current epoch time based on GPS reference
+            if gps_reference_timestamp is not None:
+                current_epoch_time = gps_reference_timestamp + (current_time - start_time_relative)
+            else:
+                current_epoch_time = None
 
-            if current_time - last_send_time >= send_interval:
-                print("Preparing data to send to TTN...")
+            # BLE scanning
+            try:
+                if current_time - last_scan_time >= scan_interval:
+                    display_message(["Scanning...", "Ruuvi sensors"])
+                    ruuvi.scan()
+                    last_scan_time = current_time
+            except Exception as e:
+                display_message(["Unexpected error"])
+                print(f"Error during BLE scanning: {e}")
 
-                temp_stats = calculate_statistics(temperature_data)
-                hum_stats = calculate_statistics(humidity_data)
-                pres_stats = calculate_statistics(pressure_data)
+            # GPS sampling
+            try:
+                if current_time - last_gps_sample_time >= gps_sample_interval:
 
-                gps_data = get_valid_gps_data(gps_handler)
+                    gps_raw = get_valid_gps_data(gps_handler)
 
-                if all(stat is not None for stat in temp_stats) and all(stat is not None for stat in hum_stats) and all(
-                        stat is not None for stat in pres_stats):
-                    payload = (
-                            pack_temp(temperature_data[-1]) +
-                            pack_humid(humidity_data[-1]) +
-                            pack_pressure(pressure_data[-1]) +
-                            pack_temp(temp_stats[0]) +
-                            pack_temp(temp_stats[1]) +
-                            pack_temp(temp_stats[2]) +
-                            pack_temp(temp_stats[3]) +
-                            pack_humid(hum_stats[0]) +
-                            pack_humid(hum_stats[1]) +
-                            pack_humid(hum_stats[2]) +
-                            pack_humid(hum_stats[3]) +
-                            pack_pressure(pres_stats[0]) +
-                            pack_pressure(pres_stats[1]) +
-                            pack_pressure(pres_stats[2]) +
-                            pack_std(pres_stats[3]) +
-                            pack_latitude(gps_data['latitude']) +
-                            pack_longitude(gps_data['longitude']) +
-                            pack_altitude(gps_data['altitude']) +
-                            pack_satellites(gps_data['satellites_in_use']) +
-                            pack_hdop(gps_data['hdop'])
-                    )
+                    if gps_raw:
+                        epoch_time = convert_to_epoch(gps_raw['timestamp'], gps_raw['date'], local_offset=1)
+                        lat = parse_latitude(gps_raw['latitude'])
+                        lon = parse_longitude(gps_raw['longitude'])
+                        gps_data_last_minute.append({'t': epoch_time, 'X': lat, 'Y': lon})
+
+                        # Setting the initial timestamp reference
+                        if gps_reference_timestamp is None:
+                            if epoch_time is not None:
+                                gps_reference_timestamp = epoch_time
+                                start_time_relative = time.time()
+                                print(f"GPS reference timestamp set to: {gps_reference_timestamp}")
+
+                    last_gps_sample_time = current_time
+            except Exception as e:
+                display_message(["Unexpected error"])
+                print(f"Error during GPS sampling: {e}")
+
+            # Filter outliers and determine representative position
+            try:
+                if current_time - last_outlier_filter_time >= outlier_filter_interval:
+                    threshold = adjust_threshold_percentile(gps_data_last_three_minutes)
+
+                    if gps_data_last_minute:
+                        gps_data_filtered = filter_outliers_by_distance(gps_data_last_minute, threshold)
+                        gps_data_last_three_minutes.extend(gps_data_filtered)
+
+                        if gps_data_filtered:
+                            gps_representative_positions.append(gps_data_filtered[-1])
+
+                    if current_epoch_time is not None and gps_data_last_three_minutes:
+                        gps_data_last_three_minutes = [
+                            data for data in gps_data_last_three_minutes
+                            if data['t'] >= current_epoch_time - 180
+                        ]
+
+                    gps_data_last_minute.clear()
+                    last_outlier_filter_time = current_time
+
+            except Exception as e:
+                display_message(["Unexpected error"])
+                print(f"Error sending data to TTN: {e}")
+
+            # Send data to LoRaWAN
+            try:
+                if current_time - last_send_time >= send_interval:
+                    print("Preparing data to send to TTN...")
+
+                    temp_stats = calculate_statistics(temperature_data)
+                    hum_stats = calculate_statistics(humidity_data)
+                    pres_stats = calculate_statistics(pressure_data)
+
+                    environmental_payload = pack_environmental_data(temp_stats, hum_stats, pres_stats)
+                    gps_payload = pack_gps_data(gps_representative_positions)
+                    payload = environmental_payload + gps_payload
 
                     display_message(["Sending data...", "To TTN"])
+
                     try:
                         lorawan.send_data(payload)
                         display_message(["Data sent!", "Successfully"])
@@ -145,25 +195,30 @@ def main(scan_interval, send_interval):
                     except Exception as e:
                         display_message(["Error sending", "data to TTN"])
                         print(f"Error sending data to TTN: {e}")
-                else:
-                    print("Insufficient data for creating payload.")
 
-                temperature_data.clear()
-                humidity_data.clear()
-                pressure_data.clear()
+                    temperature_data.clear()
+                    humidity_data.clear()
+                    pressure_data.clear()
+                    gps_representative_positions.clear()
 
-                last_send_time = current_time
+                    last_send_time = current_time
+
+            except Exception as e:
+                display_message(["Unexpected error"])
+                print(f"Error during data transmission: {e}")
 
             time.sleep(1)
-    except KeyboardInterrupt:
-        ruuvi.stop()
-        display_message(["Scanning stopped"])
-        print("Scanning stopped.")
 
-    except Exception as e:
-        ruuvi.stop()
-        display_message(["Unexpected error"])
-        print(f"Unexpected error: {e}")
+        except KeyboardInterrupt:
+            ruuvi.stop()
+            display_message(["Scanning stopped"])
+            print("Scanning stopped")
+            break
+
+        except Exception as e:
+            ruuvi.stop()
+            display_message(["Unexpected error"])
+            print(f"Error type: {type(e).__name__}, details: {e}")
 
 
 if __name__ == "__main__":

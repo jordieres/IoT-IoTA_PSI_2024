@@ -5,8 +5,7 @@ Created On: 29/10/2024
 Description: This file configures and initializes the LoRa modem (SX1262) for
              communication using SPI. It sets parameters such as frequency,
              spreading factor, bandwidth, coding rate, preamble length, and
-             output power. The function `get_modem` returns a configured modem
-             instance ready for use.
+             output power.
 """
 
 from machine import SPI, Pin
@@ -15,13 +14,14 @@ import heltec
 
 
 def get_modem():
+    """Returns a configured modem instance ready for use"""
     lora_cfg = {
         "freq_khz": 868100,
         "sf": 7,
-        "bw": "125",  # kHz
-        "coding_rate": 8,  #
+        "bw": "125",
+        "coding_rate": 8,
         "preamble_len": 8,
-        "output_power": 14,  # dBm
+        "output_power": 14,
         "syncword": 0x3444
     }
 
