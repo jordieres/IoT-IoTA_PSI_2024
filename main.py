@@ -3,8 +3,7 @@ File Name: main.py
 Author: Irene Pereda Serrano
 Created On: 29/12/2024
 Description: Main script for collecting temperature, humidity, and pressure data from RuuviTag sensors,
-             retrieving GPS data, and transmitting the processed statistics to TTN (The Things Network)
-             via LoRaWAN.
+             retrieving GPS data, and transmitting the processed statistics via LoRaWAN
 """
 
 import time
@@ -27,7 +26,7 @@ oled = oledSetup.oled
 
 
 def display_countdown(remaining_time):
-    """Display the countdown on the OLED screen."""
+    """Display the countdown on the OLED screen"""
     minutes, seconds = divmod(remaining_time, 60)
     oled.fill(0)
     oled.text("Next TTN send:", 0, 0)
@@ -37,25 +36,29 @@ def display_countdown(remaining_time):
 
 def get_valid_gps_data(gps_handler, max_attempts=10):
     """Attempts to obtain valid GPS data in a limited number of attempts"""
-    print("Checking GPS data validity...")
-    for attempt in range(max_attempts):
-        gps_handler.read_gps_data()
-        gps_data = gps_handler.get_gps_info()
+    try:
+        print("Checking GPS data validity...")
+        for attempt in range(max_attempts):
+            gps_handler.read_gps_data()
+            gps_data = gps_handler.get_gps_info()
 
-        if gps_data:
-            return gps_data
-        else:
-            print(f"Invalid GPS data on attempt {attempt + 1}. Retrying...")
-        time.sleep(1)
+            if gps_data:
+                return gps_data
 
-    print("No valid GPS data obtained after retries. Setting default values.")
-    return {
-        'latitude': "0.0000° N",
-        'longitude': "0.0000° E",
-        'altitude': 0,
-        'satellites_in_use': 0,
-        'hdop': 99.99,
-    }
+            time.sleep(1)
+
+        print("No valid GPS data obtained after retries. Setting default values.")
+        return {
+            'latitude': "0.0000° N",
+            'longitude': "0.0000° E",
+            'altitude': 0,
+            'satellites_in_use': 0,
+            'hdop': 99.99,
+            'timestamp': [0, 0, 0],
+            'date': "January 0th, 2000",
+        }
+    except Exception as e:
+        print(f"An error occurred in get_valid_gps_data(): {e}")
 
 
 def main(scan_interval, send_interval):
@@ -72,9 +75,9 @@ def main(scan_interval, send_interval):
 
     gps_sample_interval = 20
     outlier_filter_interval = 60
+
     last_gps_sample_time = time.time()
     last_outlier_filter_time = time.time()
-
     last_send_time = time.time()
     last_scan_time = time.time()
 
@@ -89,7 +92,7 @@ def main(scan_interval, send_interval):
         time.sleep(delay)
 
     def callback_handler(data):
-        """Process the received RuuviTag data and store it temporarily."""
+        """Process the received RuuviTag data and store it temporarily"""
         if data:
             temperature_data.append(data.temperature)
             humidity_data.append(data.humidity)
@@ -98,8 +101,8 @@ def main(scan_interval, send_interval):
 
     ruuvi._callback_handler = callback_handler
 
-    try:
-        while True:
+    while True:
+        try:
             current_time = time.time()
             time_to_next_send = int(send_interval - (current_time - last_send_time))
             if time_to_next_send > 0:
@@ -111,119 +114,111 @@ def main(scan_interval, send_interval):
             else:
                 current_epoch_time = None
 
-            # Muestreo de sensores BLE
-            if current_time - last_scan_time >= scan_interval:
-                display_message(["Scanning...", "Ruuvi sensors"])
-                ruuvi.scan()
-                last_scan_time = current_time
+            # BLE scanning
+            try:
+                if current_time - last_scan_time >= scan_interval:
+                    display_message(["Scanning...", "Ruuvi sensors"])
+                    ruuvi.scan()
+                    last_scan_time = current_time
+            except Exception as e:
+                display_message(["Unexpected error"])
+                print(f"Error during BLE scanning: {e}")
 
-            # Muestreo de GPS
-            if current_time - last_gps_sample_time >= gps_sample_interval:
-                gps_raw = get_valid_gps_data(gps_handler)
-                print(f"Raw gps data from Neov2m: ", gps_raw)
-                if gps_raw:
-                    epoch_time = convert_to_epoch(gps_raw['timestamp'], gps_raw['date'], local_offset=1)
-                    lat = parse_latitude(gps_raw['latitude'])
-                    lon = parse_longitude(gps_raw['longitude'])
+            # GPS sampling
+            try:
+                if current_time - last_gps_sample_time >= gps_sample_interval:
 
-                    gps_data_last_minute.append({'t': epoch_time, 'X': lat, 'Y': lon})
-                    print(f"GPS data added to last minute: {gps_data_last_minute}")
+                    gps_raw = get_valid_gps_data(gps_handler)
 
-                    # Configurar el primer timestamp GPS válido como referencia
-                    if gps_reference_timestamp is None:
-                        gps_reference_timestamp = epoch_time
-                        start_time_relative = time.time()
+                    if gps_raw:
+                        epoch_time = convert_to_epoch(gps_raw['timestamp'], gps_raw['date'], local_offset=1)
+                        lat = parse_latitude(gps_raw['latitude'])
+                        lon = parse_longitude(gps_raw['longitude'])
+                        gps_data_last_minute.append({'t': epoch_time, 'X': lat, 'Y': lon})
 
-                last_gps_sample_time = current_time
+                        # Setting the initial timestamp reference
+                        if gps_reference_timestamp is None:
+                            if epoch_time is not None:
+                                gps_reference_timestamp = epoch_time
+                                start_time_relative = time.time()
+                                print(f"GPS reference timestamp set to: {gps_reference_timestamp}")
 
-            # Filtrar outliers y determinar posición representativa
-            if current_time - last_outlier_filter_time >= outlier_filter_interval:
-                # Calcular threshold dinámico
-                try:
+                    last_gps_sample_time = current_time
+            except Exception as e:
+                display_message(["Unexpected error"])
+                print(f"Error during GPS sampling: {e}")
+
+            # Filter outliers and determine representative position
+            try:
+                if current_time - last_outlier_filter_time >= outlier_filter_interval:
                     threshold = adjust_threshold_percentile(gps_data_last_three_minutes)
-                    print(f"Dynamic threshold: {threshold}")
-                except Exception as e:
-                    print(f"Error calculating dynamic threshold: {e}")
-                    threshold = 95
 
-                # Filtrar outliers del último minuto
-                if not gps_data_last_minute:
-                    print("gps_data_last_minute is empty!")
-                    gps_data_filtered = []
-                else:
-                    gps_data_filtered = filter_outliers_by_distance(gps_data_last_minute, threshold)
-                    print(f"Filtered GPS data: {gps_data_filtered}")
+                    if gps_data_last_minute:
+                        gps_data_filtered = filter_outliers_by_distance(gps_data_last_minute, threshold)
+                        gps_data_last_three_minutes.extend(gps_data_filtered)
 
-                # Actualizar lista de últimos 3 minutos con datos filtrados
-                if gps_data_filtered:
-                    gps_data_last_three_minutes.extend(gps_data_filtered)
-                else:
-                    print("No GPS data filtered to extend into gps_data_last_three_minutes.")
+                        if gps_data_filtered:
+                            gps_representative_positions.append(gps_data_filtered[-1])
 
-                # Agregar la última posición filtrada como representativa del minuto actual
-                if gps_data_filtered:
-                    gps_representative_positions.append(gps_data_filtered[-1])
-                else:
-                    print("No GPS data filtered, skipping representative position update.")
+                    if current_epoch_time is not None and gps_data_last_three_minutes:
+                        gps_data_last_three_minutes = [
+                            data for data in gps_data_last_three_minutes
+                            if data['t'] >= current_epoch_time - 180
+                        ]
 
-                print(f"Current time: ", current_epoch_time)
-                for j in gps_data_last_three_minutes:
-                    print(f"Data time: ", j['t'])
+                    gps_data_last_minute.clear()
+                    last_outlier_filter_time = current_time
 
-                # Filtrar datos GPS más antiguos a 3 minutos
-                if current_epoch_time is not None and gps_data_last_three_minutes:
-                    gps_data_last_three_minutes = [
-                        data for data in gps_data_last_three_minutes
-                        if data['t'] >= current_epoch_time - 180
-                    ]
-                    print(f"GPS data for last 3 minutes: {gps_data_last_three_minutes}")
-                else:
-                    print("gps_data_last_three_minutes is empty, skipping filtering.")
+            except Exception as e:
+                display_message(["Unexpected error"])
+                print(f"Error sending data to TTN: {e}")
 
-                gps_data_last_minute.clear()
-                last_outlier_filter_time = current_time
+            # Send data to LoRaWAN
+            try:
+                if current_time - last_send_time >= send_interval:
+                    print("Preparing data to send to TTN...")
 
-            # Enviar datos cada `send_interval`
-            if current_time - last_send_time >= send_interval:
-                print("Preparing data to send to TTN...")
+                    temp_stats = calculate_statistics(temperature_data)
+                    hum_stats = calculate_statistics(humidity_data)
+                    pres_stats = calculate_statistics(pressure_data)
 
-                temp_stats = calculate_statistics(temperature_data)
-                hum_stats = calculate_statistics(humidity_data)
-                pres_stats = calculate_statistics(pressure_data)
-                print(f"GPS data to TTN: {gps_representative_positions}")
+                    environmental_payload = pack_environmental_data(temp_stats, hum_stats, pres_stats)
+                    gps_payload = pack_gps_data(gps_representative_positions)
+                    payload = environmental_payload + gps_payload
 
-                environmental_payload = pack_environmental_data(temp_stats, hum_stats, pres_stats)
-                gps_payload = pack_gps_data(gps_representative_positions)
+                    display_message(["Sending data...", "To TTN"])
 
-                payload = environmental_payload + gps_payload
-                print(f"Payload: ", payload)
-                display_message(["Sending data...", "To TTN"])
+                    try:
+                        lorawan.send_data(payload)
+                        display_message(["Data sent!", "Successfully"])
+                        print("Data sent to TTN successfully.")
+                    except Exception as e:
+                        display_message(["Error sending", "data to TTN"])
+                        print(f"Error sending data to TTN: {e}")
 
-                try:
-                    lorawan.send_data(payload)
-                    display_message(["Data sent!", "Successfully"])
-                    print("Data sent to TTN successfully.")
-                except Exception as e:
-                    display_message(["Error sending", "data to TTN"])
-                    print(f"Error sending data to TTN: {e}")
+                    temperature_data.clear()
+                    humidity_data.clear()
+                    pressure_data.clear()
+                    gps_representative_positions.clear()
 
-                temperature_data.clear()
-                humidity_data.clear()
-                pressure_data.clear()
-                gps_representative_positions.clear()
+                    last_send_time = current_time
 
-                last_send_time = current_time
+            except Exception as e:
+                display_message(["Unexpected error"])
+                print(f"Error during data transmission: {e}")
 
             time.sleep(1)
-    except KeyboardInterrupt:
-        ruuvi.stop()
-        display_message(["Scanning stopped"])
-        print("Scanning stopped.")
 
-    except Exception as e:
-        ruuvi.stop()
-        display_message(["Unexpected error"])
-        print(f"Unexpected error: {e}")
+        except KeyboardInterrupt:
+            ruuvi.stop()
+            display_message(["Scanning stopped"])
+            print("Scanning stopped")
+            break
+
+        except Exception as e:
+            ruuvi.stop()
+            display_message(["Unexpected error"])
+            print(f"Error type: {type(e).__name__}, details: {e}")
 
 
 if __name__ == "__main__":

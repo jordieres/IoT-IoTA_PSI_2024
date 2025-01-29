@@ -32,15 +32,15 @@ def pack_std(std):
 
 def pack_environmental_data(temp_stats, hum_stats, pres_stats):
     """
-    Packs all environmental statistics (temperature, humidity, pressure) into a single payload.
+    Packs all environmental statistics (temperature, humidity, pressure) into a single payload
 
     Args:
-        temp_stats (tuple): Max, min, mean, and std deviation for temperature.
-        hum_stats (tuple): Max, min, mean, and std deviation for humidity.
-        pres_stats (tuple): Max, min, mean, and std deviation for pressure.
+        temp_stats (tuple): Max, min, mean, and std deviation for temperature
+        hum_stats (tuple): Max, min, mean, and std deviation for humidity
+        pres_stats (tuple): Max, min, mean, and std deviation for pressure
 
     Returns:
-        bytes: Packed payload containing all environmental data.
+        bytes: Packed payload containing all environmental data
     """
     return (
             pack_temp(temp_stats[0]) +
@@ -68,7 +68,7 @@ def pack_coordinate(value):
 
 def pack_gps_data(gps_positions):
     """
-    Packs GPS data into a single payload.
+    Packs GPS data into a single payload
 
     Args:
         gps_positions (list): List of dictionaries, each containing:
@@ -77,7 +77,7 @@ def pack_gps_data(gps_positions):
             - 'Y': Longitude
 
     Returns:
-        tuple: A tuple containing the packed payload and the count of GPS positions.
+        tuple: A tuple containing the packed payload and the count of GPS positions
     """
     gps_payload = b"".join([
         pack_timestamp(gps['t']) +
@@ -85,7 +85,7 @@ def pack_gps_data(gps_positions):
         pack_coordinate(gps['Y'])
         for gps in gps_positions
     ])
-    gps_count = len(gps_positions).to_bytes(1, 'big')  # Encode the count as a single byte
+    gps_count = len(gps_positions).to_bytes(1, 'big')
     return gps_count + gps_payload
 
 
@@ -109,7 +109,7 @@ def calculate_statistics(data):
 
 
 def parse_latitude(latitude_str):
-    """Converts latitude string (e.g., '40.446° N') to decimal degrees (e.g., 40.446)."""
+    """Converts latitude string (e.g., '40.446° N') to decimal degrees (e.g., 40.446)"""
     coord, hemi = latitude_str.replace("\xb0", "°").split("°")
     decimal_lat = float(coord.strip())
     if hemi.strip().upper() == 'S':
@@ -118,7 +118,7 @@ def parse_latitude(latitude_str):
 
 
 def parse_longitude(longitude_str):
-    """Converts longitude string (e.g., '3.462° W') to decimal degrees (e.g., -3.462)."""
+    """Converts longitude string (e.g., '3.462° W') to decimal degrees (e.g., -3.462)"""
     coord, hemi = longitude_str.replace("\xb0", "°").split("°")
     decimal_lon = float(coord.strip())
     if hemi.strip().upper() == 'W':
@@ -216,16 +216,16 @@ def convert_to_epoch(timestamp, date, local_offset=0):
 
 def adjust_threshold_percentile(gps_data):
     """
-    Ajusta dinámicamente el percentil del threshold en función de la velocidad promedio.
+    Dynamically adjusts the threshold percentile based on average speed
 
     Args:
-        gps_data: Lista de dicts [{"t": timestamp, "X": lat, "Y": lon}, ...]
+        gps_data: List of dicts [{"t": timestamp, "X": lat, "Y": lon}, ...]
 
     Returns:
-        Nuevo valor de `threshold_percentile` (porcentaje) para eliminar outliers.
+        New `threshold percentage` value to eliminate outliers
     """
     if len(gps_data) < 2:
-        print("No hay suficientes datos GPS para calcular la velocidad.")
+        print("There is not enough GPS data to calculate speed")
         return 95
 
     speeds = []
@@ -236,15 +236,14 @@ def adjust_threshold_percentile(gps_data):
         )
         time_diff = gps_data[i]['t'] - gps_data[i - 1]['t']
         if time_diff > 0:
-            speeds.append(dist / time_diff)  # Velocidad en m/s
+            speeds.append(dist / time_diff)
 
     avg_speed = mean(speeds)
     print(f"Average speed: {avg_speed}")
 
-    # Ajustar el percentil según la velocidad promedio
-    if avg_speed < 1.4:  # Velocidad de caminata (~5 km/h)
-        return 85  # Umbral más estricto
-    elif avg_speed < 27:  # Velocidad de coche (~100 km/h)
-        return 95  # Umbral estándar
-    else:  # Velocidad alta (vehículos rápidos)
-        return 99  # Umbral más relajado
+    if avg_speed < 1.4:
+        return 85
+    elif avg_speed < 27:
+        return 95
+    else:
+        return 99

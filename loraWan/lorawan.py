@@ -1,7 +1,11 @@
-# LoraWan method for ABP join communications to TheThingsNetwork
-# LoraWAN packet creation methond borrowed from
-# https://github.com/lemariva/uPyLoRaWAN/blob/LoRaWAN/sx127x.py
-# I've sligtly modified it to work for our case
+"""
+File Name: lorawan.py
+Original Autor: Mauro Riva
+Acquisition Date: 29/10/2024
+Original Source: https://github.com/lemariva/uPyLoRaWAN/blob/LoRaWAN/sx127x.py
+Description: Script for ABP join communications using LoRaWAN. Encrypts and sends
+             packets over LoRaWAN.
+"""
 
 
 from loraWan.encryption_aes import AES
@@ -9,123 +13,127 @@ from loraWan import radio
 import ubinascii
 import time
 from random import randint
+import os
 
 __DEBUG__ = True
 
-ttn_config={
+ttn_config = {
     'device_address': bytearray([0x27, 0xFD, 0xF5, 0xB6]),
-    'network_key': bytearray([0x28, 0x85, 0xC8, 0xCC, 0xAF, 0xE8, 0x9C, 0xF7, 0x4F, 0x78, 0x50, 0xF1, 0xFE, 0x7B, 0xF2, 0x82]),
-    'app_key': bytearray([0x53, 0xEA, 0xE4, 0xAD, 0xC5, 0x53, 0x0D, 0x18, 0xA4, 0x1C, 0x37, 0xDC, 0x85, 0x68, 0x2C, 0x32])
+    'network_key': bytearray(
+        [0x28, 0x85, 0xC8, 0xCC, 0xAF, 0xE8, 0x9C, 0xF7, 0x4F, 0x78, 0x50, 0xF1, 0xFE, 0x7B, 0xF2, 0x82]),
+    'app_key': bytearray(
+        [0x53, 0xEA, 0xE4, 0xAD, 0xC5, 0x53, 0x0D, 0x18, 0xA4, 0x1C, 0x37, 0xDC, 0x85, 0x68, 0x2C, 0x32])
 }
 
+frame_counter_file = "frame_counter.txt"
 
-frame_counter = 0
 REG_DIO_MAPPING_1 = 0x40
 fport = 1
 
 # Frequency plans of TTN for Europe: https://www.thethingsnetwork.org/docs/lorawan/frequency-plans/
-uplink_ch=[ 868100, 868300, 868500,
+uplink_ch = [868100, 868300, 868500,
              867100, 867300, 867500,
              867700, 867900]
+
 
 downlink_ch = 869525
 
 
-def send_data(msg):
+def save_frame_counter(fc):
+    """Save the value of the Frame Counter to a file"""
+    try:
+        with open(frame_counter_file, 'w') as f:
+            f.write(str(fc))
+        if __DEBUG__:
+            print(f"Frame Counter saved: {fc}")
+    except Exception as e:
+        print(f"Error saving Frame Counter: {e}")
 
+
+def load_frame_counter():
+    """Loads the Frame Counter value from a file"""
+    try:
+        if frame_counter_file in os.listdir():
+            with open(frame_counter_file, 'r') as f:
+                fc = int(f.read())
+                if __DEBUG__:
+                    print(f"Frame Counter loaded: {fc}")
+                return fc
+        else:
+            return 0
+    except Exception as e:
+        print(f"Error loading Frame Counter: {e}")
+        return 0
+
+
+frame_counter = load_frame_counter()
+
+
+def send_data(msg):
     global frame_counter
 
-    # Send on different frequency channel
-    shuffle_freq = uplink_ch[randint(0,7)]
-
-    # I believe you'll need to send on one of the
-    # first 3 frequencies before your device is activated
-    # Later you can shuffle the messages on different freqs
-    modem.configure({'freq_khz': shuffle_freq })
+    shuffle_freq = uplink_ch[randint(0, 7)]
+    modem.configure({'freq_khz': shuffle_freq})
 
     print(f"Sending on {shuffle_freq} Khz")
 
-    # prepare packet
     buf = lorawan_pkt(msg, len(msg))
 
-    # Send msg
     modem.send(buf)
 
-    # increase counter
-    frame_counter+=1
+    frame_counter += 1
+    save_frame_counter(frame_counter)
     time.sleep(1)
 
 
 def lorawan_pkt(data, data_length):
+    global frame_counter
 
-        # Data packet
-        global frame_counter
+    enc_data = bytearray(data_length)
+    lora_pkt = bytearray(9)
 
-        enc_data = bytearray(data_length)
-        lora_pkt = bytearray(9) # was 64 in the original lib
+    enc_data[0:data_length] = data[0:data_length]
 
-        # Copy bytearray into bytearray for encryption
-        enc_data[0:data_length] = data[0:data_length]
+    aes = AES(
+        ttn_config['device_address'],
+        ttn_config['app_key'],
+        ttn_config['network_key'],
+        frame_counter
+    )
 
-        # Encrypt data (enc_data is overwritten in this function)
-        fc = frame_counter
+    enc_data = aes.encrypt(enc_data)
+    lora_pkt[0] = REG_DIO_MAPPING_1
+    lora_pkt[1] = ttn_config['device_address'][3]
+    lora_pkt[2] = ttn_config['device_address'][2]
+    lora_pkt[3] = ttn_config['device_address'][1]
+    lora_pkt[4] = ttn_config['device_address'][0]
+    lora_pkt[5] = 0x00
+    lora_pkt[6] = frame_counter & 0x00FF
+    lora_pkt[7] = (frame_counter >> 8) & 0x00FF
+    lora_pkt[8] = fport
+    lora_pkt_len = 9
 
-        aes = AES(
-            ttn_config['device_address'],
-            ttn_config['app_key'],
-            ttn_config['network_key'],
-            fc
-        )
+    if __DEBUG__:
+        print("PHYPayload", ubinascii.hexlify(lora_pkt))
 
-        enc_data = aes.encrypt(enc_data)
-        # Construct MAC Layer packet (PHYPayload)
-        # MHDR (MAC Header) - 1 byte
-        lora_pkt[0] = REG_DIO_MAPPING_1 # MType: unconfirmed data up, RFU / Major zeroed
-        # MACPayload
-        # FHDR (Frame Header): DevAddr (4 bytes) - short device address
-        lora_pkt[1] = ttn_config['device_address'][3]
-        lora_pkt[2] = ttn_config['device_address'][2]
-        lora_pkt[3] = ttn_config['device_address'][1]
-        lora_pkt[4] = ttn_config['device_address'][0]
-        # FHDR (Frame Header): FCtrl (1 byte) - frame control
-        lora_pkt[5] = 0x00
-        # FHDR (Frame Header): FCnt (2 bytes) - frame counter
-        lora_pkt[6] = frame_counter & 0x00FF
-        lora_pkt[7] = (frame_counter >> 8) & 0x00FF
-        # FPort - port field
-        lora_pkt[8] = fport
-        # Set length of LoRa packet
-        lora_pkt_len = 9
+    lora_pkt[lora_pkt_len: lora_pkt_len + data_length] = enc_data[0:data_length]
 
-        if __DEBUG__:
-            print("PHYPayload", ubinascii.hexlify(lora_pkt))
+    if __DEBUG__:
+        print("PHYPayload with FRMPayload", ubinascii.hexlify(lora_pkt))
 
-        # load encrypted data into lora_pkt
-        lora_pkt[lora_pkt_len : lora_pkt_len + data_length] = enc_data[0:data_length]
+    lora_pkt_len += data_length
 
-        if __DEBUG__:
-            print("PHYPayload with FRMPayload", ubinascii.hexlify(lora_pkt))
+    mic = bytearray(4)
+    mic = aes.calculate_mic(lora_pkt, lora_pkt_len, mic)
 
-        # Recalculate packet length
-        lora_pkt_len += data_length
+    lora_pkt[lora_pkt_len: lora_pkt_len + 4] = mic[0:4]
 
-        # Calculate Message Integrity Code (MIC)
-        # MIC is calculated over: MHDR | FHDR | FPort | FRMPayload
-        mic = bytearray(4)
-        mic = aes.calculate_mic(lora_pkt, lora_pkt_len, mic)
+    lora_pkt_len += 4
 
-        # Load MIC in package
-        lora_pkt[lora_pkt_len : lora_pkt_len + 4] = mic[0:4]
+    if __DEBUG__:
+        print("PHYPayload with FRMPayload + MIC", ubinascii.hexlify(lora_pkt))
 
-        # Recalculate packet length (add MIC length)
-        lora_pkt_len += 4
-
-        if __DEBUG__:
-            print("PHYPayload with FRMPayload + MIC", ubinascii.hexlify(lora_pkt))
-
-        return lora_pkt
-
+    return lora_pkt
 
 
 modem = radio.get_modem()
-# modem.calibrate()

@@ -7,6 +7,10 @@ Description: This file contains functions to interact with the IOTA Tangle via a
              routes, fetch tips, and submit blocks with tagged data. Additionally, it generates
              random temperature and humidity data for testing purposes and connects to Wi-Fi
              for network access.
+TODO:
+- Fill in the WiFi credentials (wifiSSID, wifiPass)
+- Provide the API URL of the node
+- Provide the desired TAG
 """
 
 import urequests as requests
@@ -29,13 +33,13 @@ def get_node_info(base_url):
     try:
         response = requests.get(url)
         if response.status_code == 200:
-            print("Información del nodo obtenida con éxito:")
+            print("Node information successfully obtained:")
             return response.json()
         else:
-            print(f"Error al obtener información del nodo: {response.status_code}, {response.text}")
+            print(f"Error getting node information: {response.status_code}, {response.text}")
             return None
     except Exception as e:
-        print(f"Error al conectar con el nodo: {e}")
+        print(f"Error connecting to node: {e}")
         return None
 
 
@@ -53,13 +57,13 @@ def get_health(base_url):
     try:
         response = requests.get(url)
         if response.status_code == 200:
-            print("El nodo está saludable.")
+            print("The node is healthy")
             return True
         else:
-            print(f"El nodo no está saludable. Estado: {response.status_code}")
+            print(f"The node is not healthy. Status: {response.status_code}")
             return False
     except Exception as e:
-        print(f"Error al conectar con el nodo: {e}")
+        print(f"Error connecting to node: {e}")
         return False
 
 
@@ -77,13 +81,13 @@ def get_api_routes(base_url):
     try:
         response = requests.get(url)
         if response.status_code == 200:
-            print("Rutas disponibles obtenidas con éxito:")
+            print("Available routes successfully obtained:")
             return response.json()
         else:
-            print(f"Error al obtener rutas: {response.status_code}, {response.text}")
+            print(f"Error getting routes: {response.status_code}, {response.text}")
             return None
     except Exception as e:
-        print(f"Error al conectar con el nodo: {e}")
+        print(f"Error connecting to node: {e}")
         return None
 
 
@@ -100,10 +104,10 @@ def get_tips(api_url):
             tips = response.json().get("tips")
             return tips
         else:
-            print(f"Error al obtener tips: {response.status_code}, {response.text}")
+            print(f"Error getting tips: {response.status_code}, {response.text}")
             return None
     except Exception as e:
-        print(f"Error al conectar con el nodo: {e}")
+        print(f"Error connecting to node: {e}")
         return None
 
 
@@ -132,7 +136,7 @@ def submit_block_with_tagged_data(api_url, tag, data):
 
     parents = get_tips(api_url)
     if not parents:
-        print("No se pudieron obtener tips válidos para el bloque.")
+        print("Could not get valid tips for the block")
         return
 
     block_payload = {
@@ -154,25 +158,25 @@ def submit_block_with_tagged_data(api_url, tag, data):
 
         if response.status_code == 201:
             block_id = response.json().get("blockId")
-            print(f"Bloque registrado con éxito. ID del bloque: {block_id}")
+            print(f"Block registered successfully. Block ID: {block_id}")
         else:
-            print(f"Error al registrar bloque: {response.status_code}, {response.text}")
+            print(f"Error registering block: {response.status_code}, {response.text}")
     except Exception as e:
-        print(f"Error al conectar con el nodo: {e}")
+        print(f"Error connecting to node: {e}")
 
 
-API_URL = "https://iota.etsii.upm.es/api/core/v2"
+API_URL = ""
 
-TAG = "UPM#APII#001"
+TAG = ""
 
 DATA = generate_random_data()
 
-WIFI_SSID = "PeredaSerrano"
-WIFI_PASSWORD = "torrejonWificasa"
+WIFI_SSID = ""
+WIFI_PASSWORD = ""
 
 if connect_wifi(WIFI_SSID, WIFI_PASSWORD):
     DATA = generate_random_data()
-    print(f"Datos generados: {DATA}")
+    print(f"Data generated: {DATA}")
     submit_block_with_tagged_data(API_URL, TAG, DATA)
 else:
-    print("Imposible conectar al Wi-Fi.")
+    print("Unable to connect to Wi-Fi")
