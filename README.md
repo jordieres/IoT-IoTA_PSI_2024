@@ -72,7 +72,7 @@ main.main(scan_interval=30, send_interval_gps=300, send_interval_env=3600)
 ````
 This method allows you to test different parameters dynamically.
 
-**2. Running Automatically (Normal Operation)**
+**2. Running automatically (Normal operation)**
 
 If the ESP32 is powered externally, the script will execute automatically upon startup, running main.py with default settings:
 - GPS data sent every 5 minutes
@@ -80,7 +80,7 @@ If the ESP32 is powered externally, the script will execute automatically upon s
 
 This ensures that the system collects and transmits data without user intervention.
 
-## **LoRaWAN Payloads**
+## **LoRaWAN payloads**
 The system transmits two types of payload to comply with LoRaWAN payload size limits:
 
 - **Type 1 (every 5 minutes):**
