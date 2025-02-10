@@ -13,15 +13,24 @@ import ubinascii
 import time
 from random import randint
 import os
+from dotenv import load_dotenv
+
+load_dotenv()
+
+device_address_str = os.getenv("DEVICE_ADDRESS")
+network_key_str = os.getenv("NETWORK_KEY")
+app_key_str = os.getenv("APP_KEY")
+
+device_address = bytearray.fromhex(device_address_str)
+network_key = bytearray.fromhex(network_key_str)
+app_key = bytearray.fromhex(app_key_str)
 
 __DEBUG__ = True
 
 ttn_config = {
-    'device_address': bytearray([0x27, 0xFD, 0xF5, 0xB6]),
-    'network_key': bytearray(
-        [0x28, 0x85, 0xC8, 0xCC, 0xAF, 0xE8, 0x9C, 0xF7, 0x4F, 0x78, 0x50, 0xF1, 0xFE, 0x7B, 0xF2, 0x82]),
-    'app_key': bytearray(
-        [0x53, 0xEA, 0xE4, 0xAD, 0xC5, 0x53, 0x0D, 0x18, 0xA4, 0x1C, 0x37, 0xDC, 0x85, 0x68, 0x2C, 0x32])
+    'device_address': device_address,
+    'network_key': network_key,
+    'app_key': app_key
 }
 
 frame_counter_file = "frame_counter.txt"
