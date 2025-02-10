@@ -7,7 +7,6 @@ Description: Script for ABP join communications using LoRaWAN. Encrypts and send
              packets over LoRaWAN.
 """
 
-
 from loraWan.encryption_aes import AES
 from loraWan import radio
 import ubinascii
@@ -34,7 +33,6 @@ fport = 1
 uplink_ch = [868100, 868300, 868500,
              867100, 867300, 867500,
              867700, 867900]
-
 
 downlink_ch = 869525
 
@@ -64,6 +62,17 @@ def load_frame_counter():
     except Exception as e:
         print(f"Error loading Frame Counter: {e}")
         return 0
+
+
+def reset_frame_counter():
+    try:
+        if "frame_counter.txt" in os.listdir():
+            os.remove("frame_counter.txt")
+            print("Frame Counter reset to 0.")
+        else:
+            print("Frame Counter file does not exist, nothing to reset.")
+    except Exception as e:
+        print(f"Error resetting Frame Counter: {e}")
 
 
 frame_counter = load_frame_counter()

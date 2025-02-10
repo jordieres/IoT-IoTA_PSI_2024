@@ -25,12 +25,16 @@ from utils import (
 oled = oledSetup.oled
 
 
-def display_countdown(remaining_time):
+def display_countdown(remaining_time_gps, remaining_time_env):
     """Display the countdown on the OLED screen"""
-    minutes, seconds = divmod(remaining_time, 60)
+    minutes_gps, seconds_gps = divmod(remaining_time_gps, 60)
+    minutes_env, seconds_env = divmod(remaining_time_env, 60)
+
     oled.fill(0)
-    oled.text("Next TTN send:", 0, 0)
-    oled.text(f"{minutes:02}:{seconds:02}", 0, 10)
+    oled.text("Next GPS send:", 0, 0)
+    oled.text(f"{minutes_gps:02}:{seconds_gps:02}", 0, 10)
+    oled.text("Next Env send:", 0, 20)
+    oled.text(f"{minutes_env:02}:{seconds_env:02}", 0, 30)
     oled.show()
 
 
@@ -48,20 +52,13 @@ def get_valid_gps_data(gps_handler, max_attempts=10):
             time.sleep(1)
 
         print("No valid GPS data obtained after retries. Setting default values.")
-        return {
-            'latitude': "0.0000° N",
-            'longitude': "0.0000° E",
-            'altitude': 0,
-            'satellites_in_use': 0,
-            'hdop': 99.99,
-            'timestamp': [0, 0, 0],
-            'date': "January 0th, 2000",
-        }
+        return None
     except Exception as e:
         print(f"An error occurred in get_valid_gps_data(): {e}")
+        return None
 
 
-def main(scan_interval, send_interval):
+def main(scan_interval, send_interval_gps, send_interval_env):
     ruuvi = core.RuuviTag()
     gps_handler = initialize_gps()
 
@@ -78,7 +75,8 @@ def main(scan_interval, send_interval):
 
     last_gps_sample_time = time.time()
     last_outlier_filter_time = time.time()
-    last_send_time = time.time()
+    last_send_time_gps = time.time()
+    last_send_time_env = time.time()
     last_scan_time = time.time()
 
     gps_reference_timestamp = None
@@ -104,9 +102,10 @@ def main(scan_interval, send_interval):
     while True:
         try:
             current_time = time.time()
-            time_to_next_send = int(send_interval - (current_time - last_send_time))
-            if time_to_next_send > 0:
-                display_countdown(time_to_next_send)
+            time_to_next_gps = int(send_interval_gps - (current_time - last_send_time_gps))
+            time_to_next_env = int(send_interval_env - (current_time - last_send_time_env))
+
+            display_countdown(time_to_next_gps, time_to_next_env)
 
             # Calculate the current epoch time based on GPS reference
             if gps_reference_timestamp is not None:
@@ -130,7 +129,7 @@ def main(scan_interval, send_interval):
 
                     gps_raw = get_valid_gps_data(gps_handler)
 
-                    if gps_raw:
+                    if gps_raw is not None:
                         epoch_time = convert_to_epoch(gps_raw['timestamp'], gps_raw['date'], local_offset=1)
                         lat = parse_latitude(gps_raw['latitude'])
                         lon = parse_longitude(gps_raw['longitude'])
@@ -175,36 +174,37 @@ def main(scan_interval, send_interval):
 
             # Send data to LoRaWAN
             try:
-                if current_time - last_send_time >= send_interval:
-                    print("Preparing data to send to TTN...")
+                # Send GPS data every 5 minutes
+                if current_time - last_send_time_gps >= send_interval_gps:
+                    gps_payload = pack_gps_data(gps_representative_positions)
+                    lorawan.send_data(gps_payload)
+                    display_message(["GPS data sent!", "Successfully"])
+                    print("Sent GPS payload to TTN")
+
+                    gps_representative_positions.clear()
+                    last_send_time_gps = current_time
+
+                # Send environmental data every 60 minutes
+                if current_time - last_send_time_env >= send_interval_env:
+                    num_samples = len(temperature_data)
 
                     temp_stats = calculate_statistics(temperature_data)
                     hum_stats = calculate_statistics(humidity_data)
                     pres_stats = calculate_statistics(pressure_data)
 
-                    environmental_payload = pack_environmental_data(temp_stats, hum_stats, pres_stats)
-                    gps_payload = pack_gps_data(gps_representative_positions)
-                    payload = environmental_payload + gps_payload
-
-                    display_message(["Sending data...", "To TTN"])
-
-                    try:
-                        lorawan.send_data(payload)
-                        display_message(["Data sent!", "Successfully"])
-                        print("Data sent to TTN successfully.")
-                    except Exception as e:
-                        display_message(["Error sending", "data to TTN"])
-                        print(f"Error sending data to TTN: {e}")
+                    env_payload = pack_environmental_data(temp_stats, hum_stats, pres_stats, num_samples)
+                    lorawan.send_data(env_payload)
+                    display_message(["Environmental data sent!", "Successfully"])
+                    print("Sent Environmental payload to TTN")
 
                     temperature_data.clear()
                     humidity_data.clear()
                     pressure_data.clear()
-                    gps_representative_positions.clear()
 
-                    last_send_time = current_time
+                    last_send_time_env = current_time
 
             except Exception as e:
-                display_message(["Unexpected error"])
+                display_message(["Error sending", "data via LoRaWAN"])
                 print(f"Error during data transmission: {e}")
 
             time.sleep(1)
@@ -225,4 +225,4 @@ if __name__ == "__main__":
     oled.fill(0)
     oled.text("Initializing...", 0, 0)
     oled.show()
-    main(scan_interval=30, send_interval=900)
+    main(scan_interval=30, send_interval_gps=300, send_interval_env=3600)
