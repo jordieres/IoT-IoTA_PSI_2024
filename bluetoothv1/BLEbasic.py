@@ -14,14 +14,14 @@ name = "ESP32-s3"
 
 ble = bluetooth.BLE()
 uart = BLEUART(ble, name)
-print(name, " Bluetooth del dispositivo activado")
+print(name, "Device Bluetooth on")
 
 led = Pin(35, Pin.OUT)
 
 
 def on_rx():
     rx_recibe = uart.read().decode().strip()
-    uart.write("ESP32-s3 dice: " + str(rx_recibe) + "\n")
+    uart.write("ESP32-s3 says: " + str(rx_recibe) + "\n")
     print(rx_recibe)
 
     if rx_recibe == "ON":

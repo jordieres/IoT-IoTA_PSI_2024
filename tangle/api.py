@@ -17,6 +17,10 @@ import urequests as requests
 import urandom
 import ujson as json
 from wifi.connectWifi import connect_wifi
+import os
+from dotenv import load_dotenv
+
+load_dotenv()
 
 
 def get_node_info(base_url):
@@ -165,14 +169,14 @@ def submit_block_with_tagged_data(api_url, tag, data):
         print(f"Error connecting to node: {e}")
 
 
-API_URL = ""
+API_URL = os.getenv("API_URL")
 
-TAG = ""
+TAG = os.getenv("TAG")
 
 DATA = generate_random_data()
 
-WIFI_SSID = ""
-WIFI_PASSWORD = ""
+WIFI_SSID = os.getenv("WIFI_SSID")
+WIFI_PASSWORD = os.getenv("WIFI_PASSWORD")
 
 if connect_wifi(WIFI_SSID, WIFI_PASSWORD):
     DATA = generate_random_data()

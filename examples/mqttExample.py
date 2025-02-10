@@ -9,17 +9,21 @@ import gc
 import time
 from mqtt.umqttsimple import MQTTClient
 from wifi.connectWifi import connect_wifi
+import os
+from dotenv import load_dotenv
 
-wifiSSID = "PeredaSerrano"
-wifiPass = "torrejonWificasa"
-mqttServer = '138.100.82.170'  # b"apiict00.etsii.upm.es"
-mqttPort = 1883
-mqttClientID = b"ESP32-S3"
-mqttUser = b"ipereda"
-mqttPass = b"Madrid#141"
-mqttTopic = b"UPM/PrdMon/S001"
+load_dotenv()
 
-if connect_wifi(wifiSSID, wifiPass):
+WIFI_SSID = os.getenv("WIFI_SSID")
+WIFI_PASSWORD = os.getenv("WIFI_PASSWORD")
+mqttServer = os.getenv("MQTTSERVER")
+mqttPort = os.getenv("MQTTPORT")
+mqttClientID = os.getenv("MQTTCLIENTID").encode()
+mqttUser = os.getenv("MQTTUSER").encode()
+mqttPass = os.getenv("MQTTPASS").encode()
+mqttTopic = os.getenv("MQTTTOPIC").encode()
+
+if connect_wifi(WIFI_SSID, WIFI_PASSWORD):
     client = MQTTClient(client_id=mqttClientID, server=mqttServer, port=mqttPort, user=mqttUser, password=mqttPass,
                         keepalive=7200, ssl=False)
     client.connect()
@@ -38,4 +42,4 @@ if connect_wifi(wifiSSID, wifiPass):
         gc.collect()
 
 else:
-    print("Imposible conectar")
+    print("Unable to connect")

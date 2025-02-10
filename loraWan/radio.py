@@ -17,11 +17,11 @@ def get_modem():
     """Returns a configured modem instance ready for use"""
     lora_cfg = {
         "freq_khz": 868100,
-        "sf": 7,
+        "sf": 12,
         "bw": "125",
         "coding_rate": 8,
         "preamble_len": 8,
-        "output_power": 14,
+        "output_power": 16,
         "syncword": 0x3444
     }
 

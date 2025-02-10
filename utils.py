@@ -30,7 +30,7 @@ def pack_std(std):
     return pack("!H", std_conv)
 
 
-def pack_environmental_data(temp_stats, hum_stats, pres_stats):
+def pack_environmental_data(temp_stats, hum_stats, pres_stats, num_samples):
     """
     Packs all environmental statistics (temperature, humidity, pressure) into a single payload
 
@@ -38,15 +38,15 @@ def pack_environmental_data(temp_stats, hum_stats, pres_stats):
         temp_stats (tuple): Max, min, mean, and std deviation for temperature
         hum_stats (tuple): Max, min, mean, and std deviation for humidity
         pres_stats (tuple): Max, min, mean, and std deviation for pressure
+        num_samples (int): Number of samples used in the statistics
 
     Returns:
         bytes: Packed payload containing all environmental data
     """
-    return (
-            pack_temp(temp_stats[0]) +
-            pack_temp(temp_stats[1]) +
-            pack_temp(temp_stats[2]) +
-            pack_temp(temp_stats[3]) +
+    payload_type = b'\x02'
+    sample_count = num_samples.to_bytes(1, 'big')
+
+    environmental_payload = (
             pack_humid(hum_stats[0]) +
             pack_humid(hum_stats[1]) +
             pack_humid(hum_stats[2]) +
@@ -54,8 +54,14 @@ def pack_environmental_data(temp_stats, hum_stats, pres_stats):
             pack_pressure(pres_stats[0]) +
             pack_pressure(pres_stats[1]) +
             pack_pressure(pres_stats[2]) +
-            pack_std(pres_stats[3])
+            pack_std(pres_stats[3]) +
+            pack_temp(temp_stats[0]) +
+            pack_temp(temp_stats[1]) +
+            pack_temp(temp_stats[2]) +
+            pack_temp(temp_stats[3])
     )
+
+    return payload_type + sample_count + environmental_payload
 
 
 def pack_timestamp(epoch_time):
@@ -72,21 +78,29 @@ def pack_gps_data(gps_positions):
 
     Args:
         gps_positions (list): List of dictionaries, each containing:
-            - 't': Timestamp
+            - 't': Timestamp (only the first one will be included)
             - 'X': Latitude
             - 'Y': Longitude
 
     Returns:
-        tuple: A tuple containing the packed payload and the count of GPS positions
+        tuple: Packed payload containing all GPS data
     """
+
+    payload_type = b'\x01'
+
+    if not gps_positions:
+        return payload_type + b'\x00'  # No GPS positions available
+
+    timestamp = pack_timestamp(gps_positions[0]['t'])
+
     gps_payload = b"".join([
-        pack_timestamp(gps['t']) +
         pack_coordinate(gps['X']) +
         pack_coordinate(gps['Y'])
         for gps in gps_positions
     ])
     gps_count = len(gps_positions).to_bytes(1, 'big')
-    return gps_count + gps_payload
+
+    return payload_type + timestamp + gps_count + gps_payload
 
 
 def mean(data):
